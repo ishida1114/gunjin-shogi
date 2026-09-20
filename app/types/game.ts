@@ -94,6 +94,18 @@ export function getValidAdjacentPositions(
   return valid
 }
 
+// 移動が有効か判定する関数（コンポーネント参照用）
+export function isValidMove(
+  from: Position,
+  to: Position,
+  piece: PieceType,
+  boardState: Record<string, { type: PieceType; owner: string }>,
+  myOwner: string
+): boolean {
+  const validMoves = getValidAdjacentPositions(from.x, from.y, piece, boardState, myOwner)
+  return validMoves.some((m) => m.x === to.x && m.y === to.y)
+}
+
 // 戦闘勝敗判定関数
 export function judgeBattle(
   attacker: PieceType,
