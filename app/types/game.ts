@@ -42,9 +42,19 @@ export function isEntryCell(x: number, y: number): boolean {
   return y === 3 && (x === 2 || x === 5)
 }
 
-// 総司令部マスの判定
+// 敵軍総司令部マスの判定（最奥中央 y=0）
+export function isEnemyHQCell(x: number, y: number): boolean {
+  return y === 0 && (x === 3 || x === 4)
+}
+
+// 自軍総司令部マスの判定（手前中央 y=6）
+export function isMyHQCell(x: number, y: number): boolean {
+  return y === 6 && (x === 3 || x === 4)
+}
+
+// 総司令部マスの汎用判定
 export function isHQCell(x: number, y: number): boolean {
-  return (y === 0 && (x === 3 || x === 4)) || (y === 6 && (x === 3 || x === 4))
+  return isEnemyHQCell(x, y) || isMyHQCell(x, y)
 }
 
 // 総司令部を占領可能か判定
