@@ -29,6 +29,26 @@ export interface Piece {
   position: Position
 }
 
+// 駒の表示名ラベル辞書
+export const PIECE_LABELS: Record<PieceType, string> = {
+  大将: '大将',
+  中将: '中将',
+  少将: '少将',
+  大佐: '大佐',
+  中佐: '中佐',
+  少佐: '少佐',
+  大尉: '大尉',
+  中尉: '中尉',
+  少尉: '少尉',
+  飛行機: '飛行機',
+  タンク: 'タンク',
+  騎兵: '騎兵',
+  工兵: '工兵',
+  スパイ: 'スパイ',
+  地雷: '地雷',
+  軍旗: '軍旗',
+}
+
 // 突入口の列（0インデックスで x=2 と x=5）
 export const ENTRY_COLUMNS = [2, 5]
 
