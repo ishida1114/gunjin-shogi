@@ -29,6 +29,19 @@ export interface Piece {
   position: Position
 }
 
+// 突入口の列（0インデックスで x=2 と x=5）
+export const ENTRY_COLUMNS = [2, 5]
+
+// 川マス（中央行 y=3 かつ 突入口以外のマス）の判定
+export function isRiverCell(x: number, y: number): boolean {
+  return y === 3 && x !== 2 && x !== 5
+}
+
+// 突入口マスの判定
+export function isEntryCell(x: number, y: number): boolean {
+  return y === 3 && (x === 2 || x === 5)
+}
+
 // 総司令部を占領可能か判定
 export function canOccupyHQ(piece: PieceType): boolean {
   const cannot = ['地雷', '軍旗', '飛行機', 'タンク']
@@ -94,7 +107,7 @@ export function getValidAdjacentPositions(
   return valid
 }
 
-// 移動が有効か判定する関数（コンポーネント参照用）
+// 移動が有効か判定する関数
 export function isValidMove(
   from: Position,
   to: Position,
