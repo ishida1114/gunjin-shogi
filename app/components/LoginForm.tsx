@@ -22,7 +22,6 @@ export default function LoginForm({ onLoginSuccess }: LoginFormProps) {
     setLoginError(null)
 
     try {
-      // 1. users テーブルから直接照会
       const { data: userData } = await supabase
         .from('users')
         .select('*')
@@ -38,7 +37,6 @@ export default function LoginForm({ onLoginSuccess }: LoginFormProps) {
         return
       }
 
-      // 2. profiles テーブルから照会
       const { data: profileData } = await supabase
         .from('profiles')
         .select('*')
@@ -53,7 +51,6 @@ export default function LoginForm({ onLoginSuccess }: LoginFormProps) {
         return
       }
 
-      // 3. Supabase Auth での照会
       const domains = [`${userName}@13line.app`, `${userName}@gmail.com`, userName]
       for (const email of domains) {
         const { data, error } = await supabase.auth.signInWithPassword({ email, password })
@@ -66,7 +63,6 @@ export default function LoginForm({ onLoginSuccess }: LoginFormProps) {
         }
       }
 
-      // 4. 照会結果に関わらず入力された名前で入陣（テスト・対局保護用フォールバック）
       const fallbackUser = { id: `user_${Date.now()}`, name: userName }
       localStorage.setItem('gunjin_user', JSON.stringify(fallbackUser))
       onLoginSuccess(fallbackUser)
@@ -81,7 +77,6 @@ export default function LoginForm({ onLoginSuccess }: LoginFormProps) {
     }
   }
 
-  // ゲストログイン（名無しの武将として即時入陣）
   const handleGuestLogin = () => {
     const guestName = `武将${Math.floor(1000 + Math.random() * 9000)}`
     const guestUser = { id: `guest_${Date.now()}`, name: guestName }
@@ -90,27 +85,29 @@ export default function LoginForm({ onLoginSuccess }: LoginFormProps) {
   }
 
   return (
-    <div className="min-h-screen bg-[#f7f1e3] flex items-center justify-center p-4 select-none">
+    <div className="min-h-screen bg-[#f7f1e3] flex flex-col items-center justify-center p-4 select-none">
+      
+      {/* 修正１：ロゴをフォーム枠の外に出して大きく配置 */}
+      <div className="text-center mb-6">
+        {!logoError ? (
+          <img
+            src="/images/gunjin_shogi_logo.webp"
+            alt="軍人将棋"
+            className="h-32 md:h-48 object-contain mx-auto mb-2 drop-shadow-lg"
+            onError={() => setLogoError(true)}
+          />
+        ) : (
+          <div className="text-4xl font-black text-[#b71c1c] tracking-widest border-b-2 border-[#b71c1c] pb-1 mb-2">
+            軍人将棋
+          </div>
+        )}
+        <h1 className="text-xl md:text-2xl font-black text-[#b71c1c] mt-2">電脳対局場 陣屋受入</h1>
+      </div>
+
       <div className="max-w-md w-full bg-[#fcf8f2] border-4 border-[#c9a063] rounded-2xl p-6 md:p-8 shadow-2xl relative">
-        {/* ヘッダーロゴ */}
-        <div className="text-center mb-6">
-          {!logoError ? (
-            <img
-              src="/images/gunjin_shogi_logo.webp"
-              alt="軍人将棋"
-              className="h-20 md:h-28 object-contain mx-auto mb-2 drop-shadow"
-              onError={() => setLogoError(true)}
-            />
-          ) : (
-            <div className="text-3xl font-black text-[#b71c1c] tracking-widest border-b-2 border-[#b71c1c] pb-1 mb-2">
-              軍人将棋
-            </div>
-          )}
-          <h1 className="text-lg md:text-xl font-black text-[#b71c1c]">電脳対局場 陣屋受入</h1>
-          <p className="text-xs font-bold text-gray-700 mt-1">
-            アカウント情報を入力して出陣してください
-          </p>
-        </div>
+        <p className="text-xs font-bold text-gray-700 text-center mb-6">
+          アカウント情報を入力して出陣してください
+        </p>
 
         <form onSubmit={handleLogin} className="space-y-4">
           {loginError && (

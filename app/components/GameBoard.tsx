@@ -23,7 +23,6 @@ export default function GameBoard({
   onCellClick,
 }: GameBoardProps) {
   const getPieceAt = (x: number, y: number): Piece | undefined => {
-    // x=4の総司令部クリック時は、x=3のデータを見に行く
     if ((y === 0 || y === 6) && x === 4) {
       return pieces.find((p) => p.position.x === 3 && p.position.y === y)
     }
@@ -47,7 +46,6 @@ export default function GameBoard({
       <div className="grid grid-cols-8 gap-1 bg-[#d2b48c] p-2 rounded-lg border-2 border-[#8b5a2b] shadow-inner">
         {[0, 1, 2, 3, 4, 5, 6].map((y) =>
           [7, 6, 5, 4, 3, 2, 1, 0].map((x) => {
-            // x=4 の総司令部マスは描画をスキップ（x=3で幅2マスとして描画）
             if ((y === 0 || y === 6) && x === 4) return null
 
             const piece = getPieceAt(x, y)
@@ -63,10 +61,18 @@ export default function GameBoard({
             return (
               <button
                 key={`${x}-${y}`}
-                // HQクリック時は強制的にx=3を送信して処理を統一
-                onClick={() => onCellClick(isEnemyHQ || isMyHQ ? 3 : x, y)}
+                // 修正５：本部への移動クリック時、有効な座標(3または4)を動的に判別して通信する
+                onClick={() => {
+                  let targetX = x
+                  if (isEnemyHQ || isMyHQ) {
+                    if (isValidMoveCell(3, y)) targetX = 3
+                    else if (isValidMoveCell(4, y)) targetX = 4
+                    else targetX = 3 // 移動時以外
+                  }
+                  onCellClick(targetX, y)
+                }}
                 className={`relative h-12 md:h-14 rounded flex flex-col items-center justify-center font-black text-xs md:text-sm transition-all border shadow-sm ${
-                  isEnemyHQ || isMyHQ ? 'col-span-2' : '' // 司令部結合
+                  isEnemyHQ || isMyHQ ? 'col-span-2' : '' 
                 } ${
                   isSelected
                     ? 'bg-amber-300 border-amber-600 scale-105 z-20 ring-2 ring-amber-500'

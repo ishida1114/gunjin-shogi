@@ -56,6 +56,7 @@ export default function Home() {
   const [turn, setTurn] = useState<'player1' | 'player2'>('player1')
   const [logs, setLogs] = useState<string[]>([])
 
+  // 画像エラーフォールバック用
   const [logoError, setLogoError] = useState(false)
   const [ruleImgError, setRuleImgError] = useState(false)
 
@@ -97,9 +98,7 @@ export default function Home() {
     }
   }, [mode])
 
-  // ==========================================
   // オンライン通信（全盤面リアルタイム同期）
-  // ==========================================
   useEffect(() => {
     if (!activeRoomId || !isOnlineMatch) return
 
@@ -109,7 +108,6 @@ export default function Home() {
 
     channel
       .on('broadcast', { event: 'GUEST_READY' }, ({ payload }) => {
-        // ホスト(player1)が、ゲスト(player2)の陣形データを受信
         if (myRole === 'player1') {
           try {
             const newP2 = payload.board
@@ -117,7 +115,6 @@ export default function Home() {
             setIsWaitingOpponent(false)
             addLog('⚔️ 対戦相手が参戦し陣形を布きました！対局開始です！')
 
-            // 最新の全盤面状態をゲストへ一括送信
             channel.send({
               type: 'broadcast',
               event: 'SYNC_FULL_STATE',
@@ -135,7 +132,6 @@ export default function Home() {
         }
       })
       .on('broadcast', { event: 'SYNC_FULL_STATE' }, ({ payload }) => {
-        // 受信側は、届いた「最新の全盤面データ」をそのままセット（ズレを100%防止）
         try {
           if (payload.p1Board) setP1Board(payload.p1Board)
           if (payload.p2Board) setP2Board(payload.p2Board)
@@ -182,7 +178,6 @@ export default function Home() {
     setLogs((prev) => [msg, ...prev.slice(0, 19)])
   }
 
-  // AI対戦開始
   const handleStartAiSetup = () => {
     setIsOnlineMatch(false)
     setIsWaitingOpponent(false)
@@ -193,10 +188,21 @@ export default function Home() {
     setMode('setup')
   }
 
-  // 部屋作成（ホスト = player1）
   const handleCreateOnlineRoom = async () => {
     if (!user) return
     setRoomErrorMsg('')
+
+    // 自分が作った過去の待機中部屋をすべて強制閉鎖（消去）
+    try {
+      await supabase
+        .from('gunjin_rooms')
+        .update({ status: 'closed' })
+        .eq('host_name', user.name)
+        .eq('status', 'waiting')
+    } catch (e) {
+      console.warn(e)
+    }
+
     const newRoomId = Math.floor(1000 + Math.random() * 9000).toString()
 
     try {
@@ -222,7 +228,6 @@ export default function Home() {
     setMode('setup')
   }
 
-  // 部屋参加（ゲスト = player2）
   const handleJoinRoom = async (room: RoomRecord) => {
     if (!user) return
     setActiveRoomId(room.room_id)
@@ -246,17 +251,14 @@ export default function Home() {
     setMode('setup')
   }
 
-  // 陣形配置完了
   const handleSetupComplete = (setupBoard: Record<string, PieceType>) => {
     if (isOnlineMatch) {
       if (myRole === 'player1') {
-        // ホストの配置 (y=4,5,6)
         setP1Board(setupBoard)
         setIsWaitingOpponent(true)
         setMode('playing')
         setLogs(['陣形配置が完了しました。対戦相手の参戦・配置完了を待っています…'])
       } else {
-        // ゲストの配置は絶対座標 (y=0,1,2) へ変換
         const canonicalP2Board: Record<string, PieceType> = {}
         Object.entries(setupBoard).forEach(([k, v]) => {
           canonicalP2Board[flipKey(k)] = v
@@ -266,7 +268,6 @@ export default function Home() {
         setMode('playing')
         setLogs(['陣形配置が完了しました。ホストと陣形を同期しています…'])
 
-        // ホストへ送信
         if (channelRef.current) {
           try {
             channelRef.current.send({
@@ -280,7 +281,6 @@ export default function Home() {
         }
       }
     } else {
-      // AI対戦時
       setP1Board(setupBoard)
       const aiBoard = generateAiBoard()
       setP2Board(aiBoard)
@@ -293,11 +293,9 @@ export default function Home() {
     }
   }
 
-  // 盤面描画（ゲスト画面でのみ反転表示）
   const getPiecesForBoard = (): Piece[] => {
     const list: Piece[] = []
     
-    // player1（ホスト）の駒
     Object.entries(p1Board).forEach(([key, type]) => {
       const renderKey = myRole === 'player2' ? flipKey(key) : key
       const [x, y] = renderKey.split('-').map(Number)
@@ -305,13 +303,11 @@ export default function Home() {
         id: `p1-${key}`,
         type,
         player: myRole === 'player1' ? 'player' : 'cpu',
-        // 対局中は相手の駒（敵コマ）を100%伏せコマ（isRevealed=false）で維持！
         isRevealed: myRole === 'player1' || mode === 'finished',
         position: { x, y }
       })
     })
     
-    // player2（ゲスト）の駒
     Object.entries(p2Board).forEach(([key, type]) => {
       const renderKey = myRole === 'player2' ? flipKey(key) : key
       const [x, y] = renderKey.split('-').map(Number)
@@ -319,7 +315,6 @@ export default function Home() {
         id: `p2-${key}`,
         type,
         player: myRole === 'player2' ? 'player' : 'cpu',
-        // 対局中は相手の駒（敵コマ）を100%伏せコマ（isRevealed=false）で維持！
         isRevealed: myRole === 'player2' || mode === 'finished',
         position: { x, y }
       })
@@ -334,7 +329,6 @@ export default function Home() {
     const isMyTurn = (myRole === 'player1' && turn === 'player1') || (myRole === 'player2' && turn === 'player2')
     if (!isMyTurn) return
 
-    // 画面座標から内部絶対座標へ変換
     const renderKey = `${renderedX}-${renderedY}`
     const internalKey = myRole === 'player2' ? flipKey(renderKey) : renderKey
     const [x, y] = internalKey.split('-').map(Number)
@@ -347,7 +341,6 @@ export default function Home() {
     Object.entries(p1Board).forEach(([k, v]) => (boardState[k] = { type: v, owner: 'player1' }))
     Object.entries(p2Board).forEach(([k, v]) => (boardState[k] = { type: v, owner: 'player2' }))
 
-    // 駒選択
     if (myPiece) {
       setSelectedKey(internalKey)
       const moves = getValidAdjacentPositions(
@@ -361,7 +354,6 @@ export default function Home() {
       return
     }
 
-    // 駒移動・戦闘
     if (selectedKey) {
       const isValid = validMoves.some((m) => m.x === x && m.y === y)
       if (!isValid) return
@@ -386,7 +378,6 @@ export default function Home() {
         ? (y === 0 && (x === 3 || x === 4))
         : (y === 6 && (x === 3 || x === 4))
 
-      // 敵総司令部占領判定
       if (isTargetHQ && canOccupyHQ(movingPiece) && !targetEnemyPiece) {
         newMyBoard[internalKey] = movingPiece
         newLogMsg = `🎉 【${movingPiece}】が敵の総司令部を占領しました！完全勝利です！`
@@ -409,10 +400,9 @@ export default function Home() {
             winnerRole = myRole
           }
         } else if (battleRes === 'defender') {
-          // 返り討ち：自コマ消滅（敵コマの正体は絶対伏せ！）
           newLogMsg = `⚔️ 無念… 自軍【${movingPiece}】は返り討ちに遭いました。`
           if (movingPiece === '軍旗') {
-            newLogMsg = '💥 自军の軍旗が失われました。敗北です…'
+            newLogMsg = '💥 自軍の軍旗が失われました。敗北です…'
             isGameFinished = true
             winnerRole = myRole === 'player1' ? 'player2' : 'player1'
           }
@@ -422,7 +412,6 @@ export default function Home() {
         }
       }
 
-      // ボード更新
       const finalP1 = myRole === 'player1' ? newMyBoard : newEnemyBoard
       const finalP2 = myRole === 'player1' ? newEnemyBoard : newMyBoard
       setP1Board(finalP1)
@@ -439,7 +428,6 @@ export default function Home() {
         saveScore(winnerRole === myRole)
       }
 
-      // オンライン対戦時：最新の全盤面状態を相手へ一括ブロードキャスト（ズレ防止）
       if (isOnlineMatch && channelRef.current) {
         try {
           channelRef.current.send({
@@ -469,7 +457,6 @@ export default function Home() {
     }
   }
 
-  // AI思考ターン
   useEffect(() => {
     if (turn === 'player2' && mode === 'playing' && !isWaitingOpponent && !isOnlineMatch) {
       const timer = setTimeout(() => {
@@ -487,7 +474,6 @@ export default function Home() {
           setTurn('player1')
         }
       }, 1000)
-
       return () => clearTimeout(timer)
     }
   }, [turn, mode, p1Board, p2Board, isWaitingOpponent, isOnlineMatch])
@@ -521,7 +507,8 @@ export default function Home() {
 
   return (
     <main className="min-h-screen bg-[#f7f1e3] p-3 md:p-6 font-sans select-none">
-      {/* 共通ヘッダーロゴ */}
+      
+      {/* 共通ヘッダーロゴの完全復活 */}
       <div className="max-w-3xl mx-auto text-center mb-4">
         <div className="flex justify-center mb-2">
           {!logoError ? (
@@ -545,7 +532,6 @@ export default function Home() {
         </p>
       </div>
 
-      {/* ① ロビー画面 */}
       {mode === 'lobby' && (
         <div className="max-w-xl mx-auto space-y-4">
           <div className="bg-[#fcf8f2] border-4 border-[#c9a063] rounded-xl p-6 shadow-xl text-center">
@@ -612,9 +598,22 @@ export default function Home() {
                           </div>
 
                           {isMyOwnRoom ? (
-                            <span className="bg-amber-100 text-amber-900 font-bold text-[11px] px-2.5 py-1 rounded border border-amber-400">
-                              🏰 あなたの陣屋
-                            </span>
+                            <div className="flex items-center gap-2">
+                              <span className="bg-amber-100 text-amber-900 font-bold text-[10px] px-2 py-1 rounded border border-amber-400">
+                                🏰 あなたの陣屋
+                              </span>
+                              <button
+                                onClick={async () => {
+                                  try {
+                                    await supabase.from('gunjin_rooms').update({ status: 'closed' }).eq('room_id', room.room_id)
+                                    fetchRooms()
+                                  } catch (e) {}
+                                }}
+                                className="bg-gray-600 hover:bg-black text-white font-bold text-xs px-2 py-1.5 rounded shadow border border-gray-800"
+                              >
+                                ✕ 閉鎖
+                              </button>
+                            </div>
                           ) : (
                             <button
                               onClick={() => handleJoinRoom(room)}
@@ -641,7 +640,6 @@ export default function Home() {
         </div>
       )}
 
-      {/* ② 陣形配置フェーズ */}
       {mode === 'setup' && (
         <PieceSetup
           onComplete={handleSetupComplete}
@@ -649,7 +647,6 @@ export default function Home() {
         />
       )}
 
-      {/* ③ 対局フェーズ / 相手待機 */}
       {(mode === 'playing' || mode === 'finished') && (
         <div className="space-y-4">
           {isWaitingOpponent && (
@@ -662,22 +659,6 @@ export default function Home() {
               </p>
             </div>
           )}
-
-          <div className="max-w-3xl mx-auto bg-[#fcf8f2] border-2 border-[#c9a063] rounded-lg p-3 md:p-4 shadow-md">
-            <h2 className="text-xs md:text-sm font-black text-[#b71c1c] mb-1 border-b border-[#c9a063] pb-1 flex items-center gap-1">
-              🏆 勝利条件・対局心得
-            </h2>
-            <ul className="text-xs font-bold text-gray-800 space-y-1 pl-1">
-              <li className="flex items-start gap-1">
-                <span className="text-[#b71c1c]">❶</span>
-                <span><strong>総司令部占領:</strong> 将校（大将〜少尉）または工兵で敵の総司令部（最奥中央）を占領する</span>
-              </li>
-              <li className="flex items-start gap-1">
-                <span className="text-[#b71c1c]">❷</span>
-                <span><strong>軍旗撃破:</strong> 敵の「軍旗」を攻め落とす（または敵駒を全滅させる）</span>
-              </li>
-            </ul>
-          </div>
 
           <div className="max-w-3xl mx-auto flex items-center justify-between">
             <button
@@ -743,7 +724,7 @@ export default function Home() {
         </div>
       )}
 
-      {/* ④ 画面最下部: rule.webp ルール解説画像 */}
+      {/* 画面最下部: rule.webp ルール解説画像の完全復活 */}
       <div className="max-w-3xl mx-auto mt-8 bg-[#fcf8f2] border-2 border-[#c9a063] rounded-lg p-3 md:p-5 shadow-md">
         <h2 className="text-sm md:text-base font-black text-[#b71c1c] mb-3 border-b border-[#c9a063] pb-1">
           📜 コマの動かし方・相克表ガイド

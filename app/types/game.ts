@@ -29,61 +29,39 @@ export interface Piece {
   position: Position
 }
 
-// 突入口の列（0インデックスで x=2 と x=5）
 export const ENTRY_COLUMNS = [2, 5]
 
-// 駒の表示名ラベル辞書
 export const PIECE_LABELS: Record<PieceType, string> = {
-  大将: '大将',
-  中将: '中将',
-  少将: '少将',
-  大佐: '大佐',
-  中佐: '中佐',
-  少佐: '少佐',
-  大尉: '大尉',
-  中尉: '中尉',
-  少尉: '少尉',
-  飛行機: '飛行機',
-  タンク: 'タンク',
-  騎兵: '騎兵',
-  工兵: '工兵',
-  スパイ: 'スパイ',
-  地雷: '地雷',
-  軍旗: '軍旗',
+  大将: '大将', 中将: '中将', 少将: '少将', 大佐: '大佐', 中佐: '中佐', 少佐: '少佐',
+  大尉: '大尉', 中尉: '中尉', 少尉: '少尉', 飛行機: '飛行機', タンク: 'タンク', 騎兵: '騎兵',
+  工兵: '工兵', スパイ: 'スパイ', 地雷: '地雷', 軍旗: '軍旗',
 }
 
-// 川マス（中央行 y=3 かつ 突入口以外のマス）の判定
 export function isRiverCell(x: number, y: number): boolean {
   return y === 3 && x !== 2 && x !== 5
 }
 
-// 突入口マスの判定
 export function isEntryCell(x: number, y: number): boolean {
   return y === 3 && (x === 2 || x === 5)
 }
 
-// 敵軍総司令部マスの判定（最奥中央 y=0）
 export function isEnemyHQCell(x: number, y: number): boolean {
   return y === 0 && (x === 3 || x === 4)
 }
 
-// 自軍総司令部マスの判定（手前中央 y=6）
 export function isMyHQCell(x: number, y: number): boolean {
   return y === 6 && (x === 3 || x === 4)
 }
 
-// 総司令部マスの汎用判定
 export function isHQCell(x: number, y: number): boolean {
   return isEnemyHQCell(x, y) || isMyHQCell(x, y)
 }
 
-// 総司令部を占領可能か判定
 export function canOccupyHQ(piece: PieceType): boolean {
   const cannot = ['地雷', '軍旗', '飛行機', 'タンク']
   return !cannot.includes(piece)
 }
 
-// 駒の移動可能範囲を計算する関数（特殊移動・川の制限を含む完全版）
 export function getValidAdjacentPositions(
   x: number,
   y: number,
@@ -95,28 +73,47 @@ export function getValidAdjacentPositions(
 
   const valid: Position[] = []
   
-  // 騎兵は前（y座標が減少する方向）のみ
   const directions = piece === '騎兵' 
     ? [{ x: 0, y: -1 }] 
     : [
-        { x: 0, y: -1 }, // 上
-        { x: 0, y: 1 },  // 下
-        { x: -1, y: 0 }, // 左
-        { x: 1, y: 0 },  // 右
+        { x: 0, y: -1 },
+        { x: 0, y: 1 },
+        { x: -1, y: 0 },
+        { x: 1, y: 0 },
       ]
 
-  // 直線移動駒（飛行機・工兵・タンク・騎兵）
-  if (piece === '飛行機' || piece === '工兵' || piece === 'タンク' || piece === '騎兵') {
+  if (piece === '飛行機') {
+    // 修正２：飛行機は味方や敵を飛び越えられる
     for (const dir of directions) {
       let nx = x + dir.x
       let ny = y + dir.y
-      
-      // タンクと騎兵は1回ごとに進める距離をチェック
       while (nx >= 0 && nx <= 7 && ny >= 0 && ny <= 6) {
-        // 川への進入制限
-        if (isRiverCell(nx, ny) && piece !== '飛行機') {
-          break // 飛行機以外は川に入れない
+        const targetKey = `${nx}-${ny}`
+        const occupant = boardState[targetKey]
+        
+        // 修正３：川には止まれないが飛び越え可能
+        if (!isRiverCell(nx, ny)) {
+          if (!occupant) {
+            valid.push({ x: nx, y: ny })
+          } else {
+            if (occupant.owner !== myOwner) {
+              valid.push({ x: nx, y: ny }) // 敵なら攻撃（着地）可能
+            }
+            // ぶつかっても飛び越えるためループは継続
+          }
         }
+        nx += dir.x
+        ny += dir.y
+      }
+    }
+  } else if (piece === '工兵' || piece === 'タンク' || piece === '騎兵') {
+    // 他の特殊コマ
+    for (const dir of directions) {
+      let nx = x + dir.x
+      let ny = y + dir.y
+      while (nx >= 0 && nx <= 7 && ny >= 0 && ny <= 6) {
+        // 修正３：川への進入不可（壁になる）
+        if (isRiverCell(nx, ny)) break
 
         const targetKey = `${nx}-${ny}`
         const occupant = boardState[targetKey]
@@ -124,24 +121,22 @@ export function getValidAdjacentPositions(
         if (!occupant) {
           valid.push({ x: nx, y: ny })
         } else {
-          // 敵の駒があればそこまで行ける（攻撃可能）
           if (occupant.owner !== myOwner) {
             valid.push({ x: nx, y: ny })
           }
-          break // 駒にぶつかったらそこでストップ
+          break // 駒にぶつかったらストップ（飛び越え不可）
         }
-
         nx += dir.x
         ny += dir.y
       }
     }
   } else {
-    // 通常駒（上下左右1マス）
+    // 通常駒
     for (const dir of directions) {
       const nx = x + dir.x
       const ny = y + dir.y
       if (nx >= 0 && nx <= 7 && ny >= 0 && ny <= 6) {
-         // 川への進入制限
+        // 修正３：川へは進入不可
         if (isRiverCell(nx, ny)) continue
 
         const targetKey = `${nx}-${ny}`
@@ -156,7 +151,6 @@ export function getValidAdjacentPositions(
   return valid
 }
 
-// 移動が有効か判定する関数
 export function isValidMove(
   from: Position,
   to: Position,
@@ -168,18 +162,15 @@ export function isValidMove(
   return validMoves.some((m) => m.x === to.x && m.y === to.y)
 }
 
-// 戦闘勝敗判定関数
 export function judgeBattle(
   attacker: PieceType,
   defender: PieceType
 ): 'attacker' | 'defender' | 'draw' {
   if (attacker === defender) return 'draw'
-
   if (defender === '地雷') {
     if (attacker === '工兵' || attacker === '飛行機') return 'attacker'
     return 'defender'
   }
-
   if (attacker === 'スパイ') {
     if (defender === '大将') return 'attacker'
     return 'defender'
@@ -188,12 +179,10 @@ export function judgeBattle(
     if (attacker === '大将') return 'defender'
     return 'attacker'
   }
-
   const rankOrder: PieceType[] = [
     '大将', '中将', '少将', '大佐', '中佐', '少佐',
     '大尉', '中尉', '少尉', '飛行機', 'タンク', '騎兵', '工兵'
   ]
-
   const aIndex = rankOrder.indexOf(attacker)
   const dIndex = rankOrder.indexOf(defender)
 
@@ -202,8 +191,6 @@ export function judgeBattle(
     if (aIndex > dIndex) return 'defender'
     return 'draw'
   }
-
   if (defender === '軍旗') return 'attacker'
-
   return 'attacker'
 }
