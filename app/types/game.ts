@@ -42,6 +42,11 @@ export function isEntryCell(x: number, y: number): boolean {
   return y === 3 && (x === 2 || x === 5)
 }
 
+// 総司令部マスの判定
+export function isHQCell(x: number, y: number): boolean {
+  return (y === 0 && (x === 3 || x === 4)) || (y === 6 && (x === 3 || x === 4))
+}
+
 // 総司令部を占領可能か判定
 export function canOccupyHQ(piece: PieceType): boolean {
   const cannot = ['地雷', '軍旗', '飛行機', 'タンク']
