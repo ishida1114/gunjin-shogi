@@ -36,17 +36,14 @@ export default function Home() {
   const [myRole, setMyRole] = useState<'player1' | 'player2'>('player1')
   const [showRanking, setShowRanking] = useState(false)
 
-  // 勝敗結果モーダル用
   const [showResultModal, setShowResultModal] = useState(false)
   const [isWinResult, setIsWinResult] = useState(false)
   const [gainedPoints, setGainedPoints] = useState(0)
 
-  // 部屋情報
   const [roomErrorMsg, setRoomErrorMsg] = useState('')
   const [openRooms, setOpenRooms] = useState<RoomRecord[]>([])
   const [activeRoomId, setActiveRoomId] = useState<string | null>(null)
 
-  // 盤面データ（全システムで絶対座標一元管理）
   const [p1Board, setP1Board] = useState<Record<string, PieceType>>({})
   const [p2Board, setP2Board] = useState<Record<string, PieceType>>({})
 
@@ -56,13 +53,11 @@ export default function Home() {
   const [turn, setTurn] = useState<'player1' | 'player2'>('player1')
   const [logs, setLogs] = useState<string[]>([])
 
-  // 画像エラーフォールバック用
   const [logoError, setLogoError] = useState(false)
   const [ruleImgError, setRuleImgError] = useState(false)
 
   const channelRef = useRef<any>(null)
 
-  // 180度座標反転関数（画面表示用）
   const flipKey = (key: string): string => {
     const [x, y] = key.split('-').map(Number)
     return `${7 - x}-${6 - y}`
@@ -72,7 +67,6 @@ export default function Home() {
     return { x: 7 - pos.x, y: 6 - pos.y }
   }
 
-  // ロビーの部屋一覧取得
   const fetchRooms = async () => {
     if (mode !== 'lobby') return
     try {
@@ -85,9 +79,7 @@ export default function Home() {
         const waiting = data.filter((r) => !r.status || r.status === 'waiting')
         setOpenRooms(waiting)
       }
-    } catch (e) {
-      console.warn('部屋取得例外:', e)
-    }
+    } catch (e) {}
   }
 
   useEffect(() => {
@@ -98,7 +90,6 @@ export default function Home() {
     }
   }, [mode])
 
-  // オンライン通信（全盤面リアルタイム同期）
   useEffect(() => {
     if (!activeRoomId || !isOnlineMatch) return
 
@@ -126,9 +117,7 @@ export default function Home() {
                 isWaitingOpponent: false,
               },
             })
-          } catch (e) {
-            console.error('陣形同期エラー(HOST):', e)
-          }
+          } catch (e) {}
         }
       })
       .on('broadcast', { event: 'SYNC_FULL_STATE' }, ({ payload }) => {
@@ -145,9 +134,7 @@ export default function Home() {
             const isWin = payload.winner === myRole
             saveScore(isWin)
           }
-        } catch (e) {
-          console.error('全盤面同期エラー:', e)
-        }
+        } catch (e) {}
       })
       .subscribe()
 
@@ -169,9 +156,7 @@ export default function Home() {
       await supabase.from('gunjin_scores').insert([
         { user_id: user.id, user_name: user.name, points }
       ])
-    } catch (e) {
-      console.error('スコア保存エラー:', e)
-    }
+    } catch (e) {}
   }
 
   const addLog = (msg: string) => {
@@ -192,16 +177,13 @@ export default function Home() {
     if (!user) return
     setRoomErrorMsg('')
 
-    // 自分が作った過去の待機中部屋をすべて強制閉鎖（消去）
     try {
       await supabase
         .from('gunjin_rooms')
         .update({ status: 'closed' })
         .eq('host_name', user.name)
         .eq('status', 'waiting')
-    } catch (e) {
-      console.warn(e)
-    }
+    } catch (e) {}
 
     const newRoomId = Math.floor(1000 + Math.random() * 9000).toString()
 
@@ -214,9 +196,7 @@ export default function Home() {
           status: 'waiting',
         },
       ])
-    } catch (e) {
-      console.warn('DB書き込み通知:', e)
-    }
+    } catch (e) {}
 
     setActiveRoomId(newRoomId)
     setIsHost(true)
@@ -244,9 +224,7 @@ export default function Home() {
         .from('gunjin_rooms')
         .update({ guest_name: user.name, status: 'playing' })
         .eq('room_id', room.room_id)
-    } catch (e) {
-      console.warn('ゲスト参加更新通知:', e)
-    }
+    } catch (e) {}
 
     setMode('setup')
   }
@@ -275,12 +253,11 @@ export default function Home() {
               event: 'GUEST_READY',
               payload: { board: canonicalP2Board },
             })
-          } catch (e) {
-            console.error('ゲスト準備完了送信エラー:', e)
-          }
+          } catch (e) {}
         }
       }
     } else {
+      // 修正4：AI対戦時は同期待ちを強制解除して即時スタート
       setP1Board(setupBoard)
       const aiBoard = generateAiBoard()
       setP2Board(aiBoard)
@@ -288,6 +265,7 @@ export default function Home() {
       setValidMoves([])
       setLastMove(null)
       setTurn('player1')
+      setIsWaitingOpponent(false) // ロック解除
       setMode('playing')
       setLogs(['陣形配置が完了しました。戦端が開かれます！'])
     }
@@ -324,7 +302,8 @@ export default function Home() {
   }
 
   const handleCellClick = (renderedX: number, renderedY: number) => {
-    if (mode !== 'playing' || isWaitingOpponent) return
+    if (mode !== 'playing') return
+    if (isOnlineMatch && isWaitingOpponent) return
 
     const isMyTurn = (myRole === 'player1' && turn === 'player1') || (myRole === 'player2' && turn === 'player2')
     if (!isMyTurn) return
@@ -342,13 +321,20 @@ export default function Home() {
     Object.entries(p2Board).forEach(([k, v]) => (boardState[k] = { type: v, owner: 'player2' }))
 
     if (myPiece) {
+      // 修正2：同じ駒のダブルタップ時は選択解除（消去防止）
+      if (selectedKey === internalKey) {
+        setSelectedKey(null)
+        setValidMoves([])
+        return
+      }
+
       setSelectedKey(internalKey)
       const moves = getValidAdjacentPositions(
         x,
         y,
         myPiece,
         boardState,
-        myRole === 'player1' ? 'player' : 'cpu'
+        myRole === 'player1' ? 'player1' : 'player2'
       )
       setValidMoves(moves)
       return
@@ -443,9 +429,7 @@ export default function Home() {
               winner: winnerRole,
             },
           })
-        } catch (e) {
-          console.error('送信エラー:', e)
-        }
+        } catch (e) {}
       }
 
       setSelectedKey(null)
@@ -507,8 +491,6 @@ export default function Home() {
 
   return (
     <main className="min-h-screen bg-[#f7f1e3] p-3 md:p-6 font-sans select-none">
-      
-      {/* 共通ヘッダーロゴの完全復活 */}
       <div className="max-w-3xl mx-auto text-center mb-4">
         <div className="flex justify-center mb-2">
           {!logoError ? (
@@ -649,13 +631,10 @@ export default function Home() {
 
       {(mode === 'playing' || mode === 'finished') && (
         <div className="space-y-4">
-          {isWaitingOpponent && (
+          {isOnlineMatch && isWaitingOpponent && (
             <div className="max-w-3xl mx-auto bg-amber-100 border-2 border-amber-500 rounded-lg p-3 text-center shadow animate-pulse">
               <p className="text-sm font-black text-amber-900">
                 ⏳ 陣形配置完了！通信同期・相手の準備完了を待っています…
-              </p>
-              <p className="text-xs font-bold text-amber-800 mt-0.5">
-                （双方が配置を完了すると自動的に開戦します）
               </p>
             </div>
           )}
@@ -671,7 +650,7 @@ export default function Home() {
               ← ロビーへ撤退
             </button>
             <span className={`inline-block px-4 py-1.5 rounded-full font-black text-xs md:text-sm shadow-md border ${
-              isWaitingOpponent
+              isOnlineMatch && isWaitingOpponent
                 ? 'bg-amber-600 text-white border-black'
                 : mode === 'finished'
                 ? 'bg-gray-700 text-gray-200 border-black'
@@ -679,7 +658,7 @@ export default function Home() {
                 ? 'bg-[#b71c1c] text-white border-black animate-pulse'
                 : 'bg-gray-700 text-gray-200 border-black'
             }`}>
-              {isWaitingOpponent
+              {isOnlineMatch && isWaitingOpponent
                 ? '⏳ 同期待ち'
                 : mode === 'finished'
                 ? '対局終了'
@@ -724,7 +703,6 @@ export default function Home() {
         </div>
       )}
 
-      {/* 画面最下部: rule.webp ルール解説画像の完全復活 */}
       <div className="max-w-3xl mx-auto mt-8 bg-[#fcf8f2] border-2 border-[#c9a063] rounded-lg p-3 md:p-5 shadow-md">
         <h2 className="text-sm md:text-base font-black text-[#b71c1c] mb-3 border-b border-[#c9a063] pb-1">
           📜 コマの動かし方・相克表ガイド
@@ -742,9 +720,6 @@ export default function Home() {
               <p className="text-[#b71c1c] font-black text-sm text-center">【相克関係（強弱）】</p>
               <p className="leading-relaxed">
                 大将 ＞ 中将 ＞ 少将 ＞ 大佐 ＞ 中佐 ＞ 少佐 ＞ 大尉 ＞ 中尉 ＞ 少尉 ＞ 飛行機 ＞ タンク ＞ 騎兵 ＞ 工兵 ＞ スパイ
-              </p>
-              <p className="text-gray-600 text-[11px]">
-                ※ スパイは大将にのみ勝利 / 工兵・飛行機は地雷を撤去可能 / 軍旗は後ろのコマが代わりに戦闘
               </p>
             </div>
           )}

@@ -73,8 +73,11 @@ export function getValidAdjacentPositions(
 
   const valid: Position[] = []
   
+  // 修正1：騎兵の移動（player1なら上 y:-1、player2なら下 y:1）
+  const forwardDir = (myOwner === 'player1') ? { x: 0, y: -1 } : { x: 0, y: 1 }
+  
   const directions = piece === '騎兵' 
-    ? [{ x: 0, y: -1 }] 
+    ? [forwardDir] 
     : [
         { x: 0, y: -1 },
         { x: 0, y: 1 },
@@ -83,7 +86,7 @@ export function getValidAdjacentPositions(
       ]
 
   if (piece === '飛行機') {
-    // 修正２：飛行機は味方や敵を飛び越えられる
+    // 修正3：飛行機（味方は飛び越えるが、敵駒のマスでストップ）
     for (const dir of directions) {
       let nx = x + dir.x
       let ny = y + dir.y
@@ -91,29 +94,26 @@ export function getValidAdjacentPositions(
         const targetKey = `${nx}-${ny}`
         const occupant = boardState[targetKey]
         
-        // 修正３：川には止まれないが飛び越え可能
         if (!isRiverCell(nx, ny)) {
           if (!occupant) {
             valid.push({ x: nx, y: ny })
-          } else {
-            if (occupant.owner !== myOwner) {
-              valid.push({ x: nx, y: ny }) // 敵なら攻撃（着地）可能
-            }
-            // ぶつかっても飛び越えるためループは継続
+          } else if (occupant.owner !== myOwner) {
+            valid.push({ x: nx, y: ny }) // 敵駒のあるマスに着地（攻撃）
+            break // 敵駒は飛び越えずにここでストップ！
           }
+          // 味方駒の場合はそのまま飛び越えて先へ進む
         }
         nx += dir.x
         ny += dir.y
       }
     }
   } else if (piece === '工兵' || piece === 'タンク' || piece === '騎兵') {
-    // 他の特殊コマ
+    // 直線移動駒
     for (const dir of directions) {
       let nx = x + dir.x
       let ny = y + dir.y
       while (nx >= 0 && nx <= 7 && ny >= 0 && ny <= 6) {
-        // 修正３：川への進入不可（壁になる）
-        if (isRiverCell(nx, ny)) break
+        if (isRiverCell(nx, ny)) break // 川は進めない
 
         const targetKey = `${nx}-${ny}`
         const occupant = boardState[targetKey]
@@ -124,19 +124,18 @@ export function getValidAdjacentPositions(
           if (occupant.owner !== myOwner) {
             valid.push({ x: nx, y: ny })
           }
-          break // 駒にぶつかったらストップ（飛び越え不可）
+          break // 駒にぶつかったらストップ
         }
         nx += dir.x
         ny += dir.y
       }
     }
   } else {
-    // 通常駒
+    // 通常駒（1マス移動）
     for (const dir of directions) {
       const nx = x + dir.x
       const ny = y + dir.y
       if (nx >= 0 && nx <= 7 && ny >= 0 && ny <= 6) {
-        // 修正３：川へは進入不可
         if (isRiverCell(nx, ny)) continue
 
         const targetKey = `${nx}-${ny}`
