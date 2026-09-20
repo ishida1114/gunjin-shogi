@@ -5,8 +5,6 @@ import {
   Position,
   isRiverCell,
   isEntryCell,
-  isEnemyHQCell,
-  isMyHQCell,
 } from '@/app/types/game'
 
 export interface GameBoardProps {
@@ -25,6 +23,10 @@ export default function GameBoard({
   onCellClick,
 }: GameBoardProps) {
   const getPieceAt = (x: number, y: number): Piece | undefined => {
+    // x=4の総司令部クリック時は、x=3のデータを見に行く
+    if ((y === 0 || y === 6) && x === 4) {
+      return pieces.find((p) => p.position.x === 3 && p.position.y === y)
+    }
     return pieces.find((p) => p.position.x === x && p.position.y === y)
   }
 
@@ -45,21 +47,27 @@ export default function GameBoard({
       <div className="grid grid-cols-8 gap-1 bg-[#d2b48c] p-2 rounded-lg border-2 border-[#8b5a2b] shadow-inner">
         {[0, 1, 2, 3, 4, 5, 6].map((y) =>
           [7, 6, 5, 4, 3, 2, 1, 0].map((x) => {
+            // x=4 の総司令部マスは描画をスキップ（x=3で幅2マスとして描画）
+            if ((y === 0 || y === 6) && x === 4) return null
+
             const piece = getPieceAt(x, y)
             const isSelected = selectedPiece?.position.x === x && selectedPiece?.position.y === y
-            const isValidMove = isValidMoveCell(x, y)
-            const isLastMove = isLastMoveCell(x, y)
+            const isValidMove = isValidMoveCell(x, y) || (isValidMoveCell(4, y) && (y===0 || y===6) && x===3)
+            const isLastMove = isLastMoveCell(x, y) || (isLastMoveCell(4, y) && (y===0 || y===6) && x===3)
 
             const isRiver = isRiverCell(x, y)
             const isEntry = isEntryCell(x, y)
-            const isEnemyHQ = isEnemyHQCell(x, y)
-            const isMyHQ = isMyHQCell(x, y)
+            const isEnemyHQ = y === 0 && x === 3
+            const isMyHQ = y === 6 && x === 3
 
             return (
               <button
                 key={`${x}-${y}`}
-                onClick={() => onCellClick(x, y)}
+                // HQクリック時は強制的にx=3を送信して処理を統一
+                onClick={() => onCellClick(isEnemyHQ || isMyHQ ? 3 : x, y)}
                 className={`relative h-12 md:h-14 rounded flex flex-col items-center justify-center font-black text-xs md:text-sm transition-all border shadow-sm ${
+                  isEnemyHQ || isMyHQ ? 'col-span-2' : '' // 司令部結合
+                } ${
                   isSelected
                     ? 'bg-amber-300 border-amber-600 scale-105 z-20 ring-2 ring-amber-500'
                     : isValidMove
@@ -93,8 +101,8 @@ export default function GameBoard({
                   <>
                     {isRiver && <span className="text-[10px] opacity-60">川</span>}
                     {isEntry && <span className="text-[10px] font-bold text-amber-900">突入口</span>}
-                    {isEnemyHQ && <span className="text-[9px] opacity-60">敵軍総司令部</span>}
-                    {isMyHQ && <span className="text-[9px] opacity-60">自軍総司令部</span>}
+                    {isEnemyHQ && <span className="text-[10px] opacity-60">敵軍総司令部</span>}
+                    {isMyHQ && <span className="text-[10px] opacity-60">自軍総司令部</span>}
                   </>
                 )}
               </button>

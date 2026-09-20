@@ -8,16 +8,17 @@ interface PieceSetupProps {
   onCancel: () => void
 }
 
+// 弐拾参枚型の正しい構成（飛行機は2つ）
 const PIECE_LIST: PieceType[] = [
   '大将', '中将', '少将',
   '大佐', '中佐', '少佐',
-  '大尉', '中尉', '少尉', '少尉', '少尉',
-  '飛行機', 'タンク', '騎兵',
+  '大尉', '中尉', '少尉', '少尉',
+  '飛行機', '飛行機', 'タンク', 'タンク', '騎兵', '騎兵',
   '工兵', '工兵',
   'スパイ',
   '地雷', '地雷',
-  '軍旗'
-]
+  '軍旗', '少尉' 
+] // 合計23枚
 
 export default function PieceSetup({ onComplete, onCancel }: PieceSetupProps) {
   const createInitialBoard = (): Record<string, PieceType> => {
@@ -26,6 +27,7 @@ export default function PieceSetup({ onComplete, onCancel }: PieceSetupProps) {
     let idx = 0
     for (let y = 4; y <= 6; y++) {
       for (let x = 0; x <= 7; x++) {
+        // 総司令部の片側(4,6)は配置スキップ（実質3,6との結合として扱うため）
         if (y === 6 && x === 4) continue
         if (idx < shuffled.length) {
           board[`${x}-${y}`] = shuffled[idx++]
@@ -44,6 +46,11 @@ export default function PieceSetup({ onComplete, onCancel }: PieceSetupProps) {
   }
 
   const handleCellClick = (x: number, y: number) => {
+    // 司令部結合部（4,6）のクリックは（3,6）へ転送
+    if (y === 6 && x === 4) {
+      x = 3
+    }
+    
     const key = `${x}-${y}`
     if (!selectedKey) {
       if (board[key]) {
@@ -74,7 +81,7 @@ export default function PieceSetup({ onComplete, onCancel }: PieceSetupProps) {
   return (
     <div className="max-w-xl mx-auto bg-[#fcf8f2] border-4 border-[#c9a063] rounded-xl p-4 shadow-xl">
       <h2 className="text-lg font-black text-[#b71c1c] text-center mb-2 border-b border-[#c9a063] pb-2">
-        🚩 陣形配置（コマの配置入れ替え）
+        🚩 陣形配置
       </h2>
       <p className="text-xs font-bold text-gray-700 text-center mb-4">
         コマを選択し、別のマスをタップすると配置を入れ替えられます。
@@ -84,16 +91,21 @@ export default function PieceSetup({ onComplete, onCancel }: PieceSetupProps) {
         <div className="grid grid-cols-8 gap-1">
           {[4, 5, 6].map((y) =>
             [7, 6, 5, 4, 3, 2, 1, 0].map((x) => {
+              // 4列目は描画スキップ（3列目でcol-span-2を使って描画する）
+              if (y === 6 && x === 4) return null
+              
               const key = `${x}-${y}`
               const piece = board[key]
               const isSelected = selectedKey === key
-              const isHQ = y === 6 && (x === 3 || x === 4)
+              const isHQ = y === 6 && x === 3
 
               return (
                 <button
                   key={key}
                   onClick={() => handleCellClick(x, y)}
                   className={`h-12 rounded flex flex-col items-center justify-center font-black text-xs transition-all shadow-sm border ${
+                    isHQ ? 'col-span-2' : '' // 総司令部は2マス分の幅
+                  } ${
                     isSelected
                       ? 'bg-amber-300 border-amber-600 scale-105 z-10 ring-2 ring-amber-500'
                       : piece
@@ -122,13 +134,13 @@ export default function PieceSetup({ onComplete, onCancel }: PieceSetupProps) {
           onClick={onCancel}
           className="bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold px-4 py-2 rounded text-xs border border-gray-400"
         >
-          ← キャンセル
+          ← 撤退
         </button>
         <button
           onClick={handleRandomize}
           className="bg-amber-700 hover:bg-amber-800 text-white font-black px-4 py-2 rounded text-xs border border-black shadow"
         >
-          🎲 ランダム再配置
+          🎲 ランダム配置
         </button>
         <button
           onClick={() => isComplete && onComplete(board)}
@@ -139,7 +151,7 @@ export default function PieceSetup({ onComplete, onCancel }: PieceSetupProps) {
               : 'bg-gray-400 text-gray-200 cursor-not-allowed'
           }`}
         >
-          ⚔️ 配置完了・出陣
+          ⚔️ 出陣
         </button>
       </div>
     </div>

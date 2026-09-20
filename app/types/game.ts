@@ -29,6 +29,9 @@ export interface Piece {
   position: Position
 }
 
+// 突入口の列（0インデックスで x=2 と x=5）
+export const ENTRY_COLUMNS = [2, 5]
+
 // 駒の表示名ラベル辞書
 export const PIECE_LABELS: Record<PieceType, string> = {
   大将: '大将',
@@ -48,9 +51,6 @@ export const PIECE_LABELS: Record<PieceType, string> = {
   地雷: '地雷',
   軍旗: '軍旗',
 }
-
-// 突入口の列（0インデックスで x=2 と x=5）
-export const ENTRY_COLUMNS = [2, 5]
 
 // 川マス（中央行 y=3 かつ 突入口以外のマス）の判定
 export function isRiverCell(x: number, y: number): boolean {
@@ -83,7 +83,7 @@ export function canOccupyHQ(piece: PieceType): boolean {
   return !cannot.includes(piece)
 }
 
-// 駒の移動可能範囲を計算する関数
+// 駒の移動可能範囲を計算する関数（特殊移動・川の制限を含む完全版）
 export function getValidAdjacentPositions(
   x: number,
   y: number,
@@ -94,32 +94,43 @@ export function getValidAdjacentPositions(
   if (piece === '地雷' || piece === '軍旗') return []
 
   const valid: Position[] = []
-  const directions = [
-    { x: 0, y: -1 }, // 上
-    { x: 0, y: 1 },  // 下
-    { x: -1, y: 0 }, // 左
-    { x: 1, y: 0 },  // 右
-  ]
+  
+  // 騎兵は前（y座標が減少する方向）のみ
+  const directions = piece === '騎兵' 
+    ? [{ x: 0, y: -1 }] 
+    : [
+        { x: 0, y: -1 }, // 上
+        { x: 0, y: 1 },  // 下
+        { x: -1, y: 0 }, // 左
+        { x: 1, y: 0 },  // 右
+      ]
 
-  // 直線移動駒（飛行機・工兵・タンク）
-  if (piece === '飛行機' || piece === '工兵' || piece === 'タンク') {
+  // 直線移動駒（飛行機・工兵・タンク・騎兵）
+  if (piece === '飛行機' || piece === '工兵' || piece === 'タンク' || piece === '騎兵') {
     for (const dir of directions) {
       let nx = x + dir.x
       let ny = y + dir.y
+      
+      // タンクと騎兵は1回ごとに進める距離をチェック
       while (nx >= 0 && nx <= 7 && ny >= 0 && ny <= 6) {
+        // 川への進入制限
+        if (isRiverCell(nx, ny) && piece !== '飛行機') {
+          break // 飛行機以外は川に入れない
+        }
+
         const targetKey = `${nx}-${ny}`
         const occupant = boardState[targetKey]
 
         if (!occupant) {
           valid.push({ x: nx, y: ny })
         } else {
+          // 敵の駒があればそこまで行ける（攻撃可能）
           if (occupant.owner !== myOwner) {
             valid.push({ x: nx, y: ny })
           }
-          break
+          break // 駒にぶつかったらそこでストップ
         }
 
-        if (piece !== '飛行機' && piece !== '工兵') break
         nx += dir.x
         ny += dir.y
       }
@@ -130,6 +141,9 @@ export function getValidAdjacentPositions(
       const nx = x + dir.x
       const ny = y + dir.y
       if (nx >= 0 && nx <= 7 && ny >= 0 && ny <= 6) {
+         // 川への進入制限
+        if (isRiverCell(nx, ny)) continue
+
         const targetKey = `${nx}-${ny}`
         const occupant = boardState[targetKey]
         if (!occupant || occupant.owner !== myOwner) {
@@ -161,13 +175,11 @@ export function judgeBattle(
 ): 'attacker' | 'defender' | 'draw' {
   if (attacker === defender) return 'draw'
 
-  // 地雷判定
   if (defender === '地雷') {
     if (attacker === '工兵' || attacker === '飛行機') return 'attacker'
     return 'defender'
   }
 
-  // スパイ判定（大将にのみ勝利）
   if (attacker === 'スパイ') {
     if (defender === '大将') return 'attacker'
     return 'defender'
@@ -177,7 +189,6 @@ export function judgeBattle(
     return 'attacker'
   }
 
-  // 階級順位表
   const rankOrder: PieceType[] = [
     '大将', '中将', '少将', '大佐', '中佐', '少佐',
     '大尉', '中尉', '少尉', '飛行機', 'タンク', '騎兵', '工兵'
