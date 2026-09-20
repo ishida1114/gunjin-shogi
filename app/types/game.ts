@@ -1,186 +1,138 @@
-// 23枚型のコマ種別定義
 export type PieceType =
-  | 'taisho'   // 大将
-  | 'chujo'    // 中将
-  | 'shojo'    // 少将
-  | 'taisa'    // 大佐
-  | 'chusa'    // 中佐
-  | 'shosa'    // 少佐
-  | 'taii'     // 大尉
-  | 'chui'     // 中尉
-  | 'shoi'     // 少尉
-  | 'kohei'    // 工兵
-  | 'kikou'    // 騎兵
-  | 'tanku'    // タンク
-  | 'hikoki'   // ヒコーキ
-  | 'spy'      // スパイ
-  | 'jira'     // 地雷
-  | 'gunki'    // 軍旗
+  | '大将'
+  | '中将'
+  | '少将'
+  | '大佐'
+  | '中佐'
+  | '少佐'
+  | '大尉'
+  | '中尉'
+  | '少尉'
+  | '飛行機'
+  | 'タンク'
+  | '騎兵'
+  | '工兵'
+  | 'スパイ'
+  | '地雷'
+  | '軍旗'
 
-export type Player = 'player1' | 'player2'
+export interface Position {
+  x: number
+  y: number
+}
 
 export interface Piece {
   id: string
   type: PieceType
-  owner: Player
-  isFaceUp: boolean
+  player: 'player' | 'cpu'
+  isRevealed?: boolean
+  position: Position
 }
 
-export const PIECE_LABELS: Record<PieceType, string> = {
-  taisho: '大将',
-  chujo: '中将',
-  shojo: '少将',
-  taisa: '大佐',
-  chusa: '中佐',
-  shosa: '少佐',
-  taii: '大尉',
-  chui: '中尉',
-  shoi: '少尉',
-  kohei: '工兵',
-  kikou: '騎兵',
-  tanku: 'タンク',
-  hikoki: 'ヒコーキ',
-  spy: 'スパイ',
-  jira: '地雷',
-  gunki: '軍旗',
+// 総司令部を占領可能か判定
+export function canOccupyHQ(piece: PieceType): boolean {
+  const cannot = ['地雷', '軍旗', '飛行機', 'タンク']
+  return !cannot.includes(piece)
 }
 
-// 突入口列 (x=2, x=5)
-export const ENTRY_COLUMNS = [2, 5]
+// 駒の移動可能範囲を計算する関数
+export function getValidAdjacentPositions(
+  x: number,
+  y: number,
+  piece: PieceType,
+  boardState: Record<string, { type: PieceType; owner: string }>,
+  myOwner: string
+): Position[] {
+  if (piece === '地雷' || piece === '軍旗') return []
 
-export function isRiverCell(x: number, y: number): boolean {
-  return y === 3 && !ENTRY_COLUMNS.includes(x)
-}
-
-export function isEntryCell(x: number, y: number): boolean {
-  return y === 3 && ENTRY_COLUMNS.includes(x)
-}
-
-export function isHQCell(x: number, y: number): boolean {
-  return (y === 0 || y === 6) && (x === 3 || x === 4)
-}
-
-export function isEnemyHQCell(x: number, y: number, myRole: Player): boolean {
-  return myRole === 'player1'
-    ? y === 6 && (x === 3 || x === 4)
-    : y === 0 && (x === 3 || x === 4)
-}
-
-/**
- * 本部（総司令部）を占領できるコマかどうかの判定
- * 将校（大将〜少尉）および工兵のみ占領可能
- */
-export function canOccupyHQ(pieceType: PieceType): boolean {
-  const allowedPieces: PieceType[] = [
-    'taisho', 'chujo', 'shojo',
-    'taisa', 'chusa', 'shosa',
-    'taii', 'chui', 'shoi',
-    'kohei'
+  const valid: Position[] = []
+  const directions = [
+    { x: 0, y: -1 }, // 上
+    { x: 0, y: 1 },  // 下
+    { x: -1, y: 0 }, // 左
+    { x: 1, y: 0 },  // 右
   ]
-  return allowedPieces.includes(pieceType)
+
+  // 直線移動駒（飛行機・工兵・タンク）
+  if (piece === '飛行機' || piece === '工兵' || piece === 'タンク') {
+    for (const dir of directions) {
+      let nx = x + dir.x
+      let ny = y + dir.y
+      while (nx >= 0 && nx <= 7 && ny >= 0 && ny <= 6) {
+        const targetKey = `${nx}-${ny}`
+        const occupant = boardState[targetKey]
+
+        if (!occupant) {
+          valid.push({ x: nx, y: ny })
+        } else {
+          if (occupant.owner !== myOwner) {
+            valid.push({ x: nx, y: ny })
+          }
+          break
+        }
+
+        if (piece !== '飛行機' && piece !== '工兵') break
+        nx += dir.x
+        ny += dir.y
+      }
+    }
+  } else {
+    // 通常駒（上下左右1マス）
+    for (const dir of directions) {
+      const nx = x + dir.x
+      const ny = y + dir.y
+      if (nx >= 0 && nx <= 7 && ny >= 0 && ny <= 6) {
+        const targetKey = `${nx}-${ny}`
+        const occupant = boardState[targetKey]
+        if (!occupant || occupant.owner !== myOwner) {
+          valid.push({ x: nx, y: ny })
+        }
+      }
+    }
+  }
+
+  return valid
 }
 
-export type BattleResult = 'attacker' | 'defender' | 'both_draw'
+// 戦闘勝敗判定関数
+export function judgeBattle(
+  attacker: PieceType,
+  defender: PieceType
+): 'attacker' | 'defender' | 'draw' {
+  if (attacker === defender) return 'draw'
 
-export function judgeBattle(attacker: PieceType, defender: PieceType): BattleResult {
-  if (attacker === defender) return 'both_draw'
-
-  if (attacker === 'kohei') {
-    if (defender === 'jira' || defender === 'spy' || defender === 'tanku') return 'attacker'
-  }
-  if (defender === 'kohei' && attacker === 'tanku') return 'defender'
-
-  if (defender === 'jira') {
-    if (attacker === 'kohei' || attacker === 'hikoki') return 'attacker'
+  // 地雷判定
+  if (defender === '地雷') {
+    if (attacker === '工兵' || attacker === '飛行機') return 'attacker'
     return 'defender'
   }
 
-  if (attacker === 'spy') return defender === 'taisho' ? 'attacker' : 'defender'
-  if (defender === 'spy') return attacker === 'taisho' ? 'defender' : 'attacker'
-
-  const rank: Record<PieceType, number> = {
-    taisho: 12,
-    chujo: 11,
-    shojo: 10,
-    taisa: 9,
-    chusa: 8,
-    shosa: 7,
-    taii: 6,
-    chui: 5,
-    shoi: 4,
-    tanku: 8,
-    kikou: 3,
-    hikoki: 9,
-    kohei: 2,
-    spy: 1,
-    jira: 0,
-    gunki: 0,
+  // スパイ判定（大将にのみ勝利）
+  if (attacker === 'スパイ') {
+    if (defender === '大将') return 'attacker'
+    return 'defender'
+  }
+  if (defender === 'スパイ') {
+    if (attacker === '大将') return 'defender'
+    return 'attacker'
   }
 
-  const aRank = rank[attacker] ?? 0
-  const dRank = rank[defender] ?? 0
+  // 階級順位表
+  const rankOrder: PieceType[] = [
+    '大将', '中将', '少将', '大佐', '中佐', '少佐',
+    '大尉', '中尉', '少尉', '飛行機', 'タンク', '騎兵', '工兵'
+  ]
 
-  if (aRank > dRank) return 'attacker'
-  if (aRank < dRank) return 'defender'
-  return 'both_draw'
-}
+  const aIndex = rankOrder.indexOf(attacker)
+  const dIndex = rankOrder.indexOf(defender)
 
-export function isValidMove(
-  pieceType: PieceType,
-  owner: Player,
-  from: { x: number; y: number },
-  to: { x: number; y: number },
-  boardState: Record<string, { type: PieceType; owner: Player }>
-): boolean {
-  if (pieceType === 'jira' || pieceType === 'gunki') return false
-
-  // 川マスへの移動不可
-  if (isRiverCell(to.x, to.y)) return false
-
-  // 敵の本部へは、占領権限のあるコマ（将校・工兵）しか進入不可
-  if (isEnemyHQCell(to.x, to.y, owner) && !canOccupyHQ(pieceType)) {
-    return false
+  if (aIndex !== -1 && dIndex !== -1) {
+    if (aIndex < dIndex) return 'attacker'
+    if (aIndex > dIndex) return 'defender'
+    return 'draw'
   }
 
-  const dx = to.x - from.x
-  const dy = to.y - from.y
-  const absDx = Math.abs(dx)
-  const absDy = Math.abs(dy)
+  if (defender === '軍旗') return 'attacker'
 
-  if (dx === 0 && dy === 0) return false
-
-  const forwardY = owner === 'player1' ? 1 : -1
-  const forwardDy = dy * forwardY
-
-  if (pieceType === 'hikoki') {
-    if (absDx === 0 && absDy > 0) return true
-    if (absDx === 1 && absDy === 0) return true
-    return false
-  }
-
-  if (pieceType === 'kohei') {
-    if (absDx > 0 && absDy > 0) return false
-    const stepX = dx === 0 ? 0 : dx > 0 ? 1 : -1
-    const stepY = dy === 0 ? 0 : dy > 0 ? 1 : -1
-    let curX = from.x + stepX
-    let curY = from.y + stepY
-
-    while (curX !== to.x || curY !== to.y) {
-      if (isRiverCell(curX, curY) || boardState[`${curX}-${curY}`]) return false
-      curX += stepX
-      curY += stepY
-    }
-    return true
-  }
-
-  if (pieceType === 'tanku' || pieceType === 'kikou') {
-    if (absDx === 0 && forwardDy >= 1 && forwardDy <= 2) return true
-    if (absDx === 0 && forwardDy === -1) return true
-    if (absDx === 1 && absDy === 0) return true
-    return false
-  }
-
-  if (absDx + absDy === 1) return true
-
-  return false
+  return 'attacker'
 }
