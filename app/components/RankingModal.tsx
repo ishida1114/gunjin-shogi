@@ -8,10 +8,8 @@ interface RankingModalProps {
 }
 
 interface ScoreRecord {
-  id?: string
   user_name: string
   points: number
-  created_at?: string
 }
 
 export default function RankingModal({ onClose }: RankingModalProps) {
@@ -20,21 +18,56 @@ export default function RankingModal({ onClose }: RankingModalProps) {
 
   useEffect(() => {
     const fetchScores = async () => {
+      let combinedScores: ScoreRecord[] = []
+
+      // 1. Supabase からスコア取得
       try {
         const { data, error } = await supabase
           .from('gunjin_scores')
-          .select('*')
+          .select('user_name, points')
           .order('points', { ascending: false })
-          .limit(10)
+          .limit(50)
 
-        if (data && !error) {
-          setScores(data)
+        if (data && !error && data.length > 0) {
+          combinedScores = data.map((d: any) => ({
+            user_name: d.user_name || '名無しの武将',
+            points: Number(d.points) || 0,
+          }))
         }
       } catch (e) {
-        console.warn('ランキング取得例外:', e)
-      } finally {
-        setLoading(false)
+        console.warn('DBスコア取得例外:', e)
       }
+
+      // 2. ローカルストレージのスコアを結合（DBエラー時のフォールバック対応）
+      try {
+        const localData = localStorage.getItem('gunjin_local_scores')
+        if (localData) {
+          const parsed = JSON.parse(localData)
+          if (Array.isArray(parsed)) {
+            parsed.forEach((item: any) => {
+              combinedScores.push({
+                user_name: item.user_name || '名無しの武将',
+                points: Number(item.points) || 0,
+              })
+            })
+          }
+        }
+      } catch (e) {}
+
+      // 3. 武将名ごとに武功ポイントを合算して集計
+      const scoreMap: Record<string, number> = {}
+      combinedScores.forEach((s) => {
+        const name = s.user_name
+        scoreMap[name] = (scoreMap[name] || 0) + s.points
+      })
+
+      const aggregated = Object.entries(scoreMap)
+        .map(([user_name, points]) => ({ user_name, points }))
+        .sort((a, b) => b.points - a.points)
+        .slice(0, 10)
+
+      setScores(aggregated)
+      setLoading(false)
     }
 
     fetchScores()
@@ -65,7 +98,7 @@ export default function RankingModal({ onClose }: RankingModalProps) {
           <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
             {scores.map((s, idx) => (
               <div
-                key={s.id || idx}
+                key={idx}
                 className="flex items-center justify-between bg-white p-3 rounded-lg border border-[#a87c4f] shadow-sm"
               >
                 <div className="flex items-center gap-3">
@@ -83,7 +116,7 @@ export default function RankingModal({ onClose }: RankingModalProps) {
                     {idx + 1}
                   </span>
                   <span className="text-sm font-bold text-gray-900">
-                    {s.user_name || '名無しの武将'} 殿
+                    {s.user_name} 殿
                   </span>
                 </div>
                 <span className="text-sm font-black text-[#b71c1c]">

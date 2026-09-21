@@ -74,7 +74,6 @@ export function canOccupyHQ(piece: PieceType): boolean {
   return !cannot.includes(piece)
 }
 
-// 防御側駒の「すぐ後ろの駒」を取得する補助関数（軍旗用）
 export function getBehindPiece(
   defenderKey: string,
   defenderOwner: string,
@@ -88,88 +87,23 @@ export function getBehindPiece(
 }
 
 // 添付の星取り表（hoshitorihyou.jpg）に100%完全準拠した勝敗判定マトリックス
-// 〇: 'attacker', ×: 'defender', -: 'draw'
 const BATTLE_MATRIX: Record<PieceType, Record<PieceType, 'attacker' | 'defender' | 'draw'>> = {
-  大将: {
-    大将: 'draw', 中将: 'attacker', 少将: 'attacker', 飛行機: 'attacker', タンク: 'attacker',
-    大佐: 'attacker', 中佐: 'attacker', 少佐: 'attacker', 大尉: 'attacker', 中尉: 'attacker', 少尉: 'attacker',
-    騎兵: 'attacker', 工兵: 'attacker', スパイ: 'defender', 地雷: 'draw', 軍旗: 'attacker'
-  },
-  中将: {
-    大将: 'defender', 中将: 'draw', 少将: 'attacker', 飛行機: 'attacker', タンク: 'attacker',
-    大佐: 'attacker', 中佐: 'attacker', 少佐: 'attacker', 大尉: 'attacker', 中尉: 'attacker', 少尉: 'attacker',
-    騎兵: 'attacker', 工兵: 'attacker', スパイ: 'attacker', 地雷: 'draw', 軍旗: 'attacker'
-  },
-  少将: {
-    大将: 'defender', 中将: 'defender', 少将: 'draw', 飛行機: 'attacker', タンク: 'attacker',
-    大佐: 'attacker', 中佐: 'attacker', 少佐: 'attacker', 大尉: 'attacker', 中尉: 'attacker', 少尉: 'attacker',
-    騎兵: 'attacker', 工兵: 'attacker', スパイ: 'attacker', 地雷: 'draw', 軍旗: 'attacker'
-  },
-  飛行機: {
-    大将: 'defender', 中将: 'defender', 少将: 'defender', 飛行機: 'draw', タンク: 'attacker',
-    大佐: 'attacker', 中佐: 'attacker', 少佐: 'attacker', 大尉: 'attacker', 中尉: 'attacker', 少尉: 'attacker',
-    騎兵: 'attacker', 工兵: 'attacker', スパイ: 'attacker', 地雷: 'attacker', 軍旗: 'attacker'
-  },
-  タンク: {
-    大将: 'defender', 中将: 'defender', 少将: 'defender', 飛行機: 'defender', タンク: 'draw',
-    大佐: 'attacker', 中佐: 'attacker', 少佐: 'attacker', 大尉: 'attacker', 中尉: 'attacker', 少尉: 'attacker',
-    騎兵: 'attacker', 工兵: 'attacker', スパイ: 'attacker', 地雷: 'draw', 軍旗: 'attacker'
-  },
-  大佐: {
-    大将: 'defender', 中将: 'defender', 少将: 'defender', 飛行機: 'defender', タンク: 'defender',
-    大佐: 'draw', 中佐: 'attacker', 少佐: 'attacker', 大尉: 'attacker', 中尉: 'attacker', 少尉: 'attacker',
-    騎兵: 'attacker', 工兵: 'attacker', スパイ: 'attacker', 地雷: 'draw', 軍旗: 'attacker'
-  },
-  中佐: {
-    大将: 'defender', 中将: 'defender', 少将: 'defender', 飛行機: 'defender', タンク: 'defender',
-    大佐: 'defender', 中佐: 'draw', 少佐: 'attacker', 大尉: 'attacker', 中尉: 'attacker', 少尉: 'attacker',
-    騎兵: 'attacker', 工兵: 'attacker', スパイ: 'attacker', 地雷: 'draw', 軍旗: 'attacker'
-  },
-  少佐: {
-    大将: 'defender', 中将: 'defender', 少将: 'defender', 飛行機: 'defender', タンク: 'defender',
-    大佐: 'defender', 中佐: 'defender', 少佐: 'draw', 大尉: 'attacker', 中尉: 'attacker', 少尉: 'attacker',
-    騎兵: 'attacker', 工兵: 'attacker', スパイ: 'attacker', 地雷: 'draw', 軍旗: 'attacker'
-  },
-  大尉: {
-    大将: 'defender', 中将: 'defender', 少将: 'defender', 飛行機: 'defender', タンク: 'defender',
-    大佐: 'defender', 中佐: 'defender', 少佐: 'defender', 大尉: 'draw', 中尉: 'attacker', 少尉: 'attacker',
-    騎兵: 'attacker', 工兵: 'attacker', スパイ: 'attacker', 地雷: 'draw', 軍旗: 'attacker'
-  },
-  中尉: {
-    大将: 'defender', 中将: 'defender', 少将: 'defender', 飛行機: 'defender', タンク: 'defender',
-    大佐: 'defender', 中佐: 'defender', 少佐: 'defender', 大尉: 'defender', 中尉: 'draw', 少尉: 'attacker',
-    騎兵: 'attacker', 工兵: 'attacker', スパイ: 'attacker', 地雷: 'draw', 軍旗: 'attacker'
-  },
-  少尉: {
-    大将: 'defender', 中将: 'defender', 少将: 'defender', 飛行機: 'defender', タンク: 'defender',
-    大佐: 'defender', 中佐: 'defender', 少佐: 'defender', 大尉: 'defender', 中尉: 'defender', 少尉: 'draw',
-    騎兵: 'attacker', 工兵: 'attacker', スパイ: 'attacker', 地雷: 'draw', 軍旗: 'attacker'
-  },
-  騎兵: {
-    大将: 'defender', 中将: 'defender', 少将: 'defender', 飛行機: 'defender', タンク: 'defender',
-    大佐: 'defender', 中佐: 'defender', 少佐: 'defender', 大尉: 'defender', 中尉: 'defender', 少尉: 'defender',
-    騎兵: 'draw', 工兵: 'attacker', スパイ: 'attacker', 地雷: 'draw', 軍旗: 'attacker'
-  },
-  工兵: {
-    大将: 'defender', 中将: 'defender', 少将: 'defender', 飛行機: 'defender', タンク: 'defender',
-    大佐: 'defender', 中佐: 'defender', 少佐: 'defender', 大尉: 'defender', 中尉: 'defender', 少尉: 'defender',
-    騎兵: 'defender', 工兵: 'draw', スパイ: 'attacker', 地雷: 'attacker', 軍旗: 'attacker'
-  },
-  スパイ: {
-    大将: 'attacker', 中将: 'defender', 少将: 'defender', 飛行機: 'defender', タンク: 'defender',
-    大佐: 'defender', 中佐: 'defender', 少佐: 'defender', 大尉: 'defender', 中尉: 'defender', 少尉: 'defender',
-    騎兵: 'defender', 工兵: 'defender', スパイ: 'draw', 地雷: 'draw', 軍旗: 'attacker'
-  },
-  地雷: {
-    大将: 'draw', 中将: 'draw', 少将: 'draw', 飛行機: 'defender', タンク: 'draw',
-    大佐: 'draw', 中佐: 'draw', 少佐: 'draw', 大尉: 'draw', 中尉: 'draw', 少尉: 'draw',
-    騎兵: 'draw', 工兵: 'defender', スパイ: 'draw', 地雷: 'draw', 軍旗: 'draw'
-  },
-  軍旗: {
-    大将: 'defender', 中将: 'defender', 少将: 'defender', 飛行機: 'defender', タンク: 'defender',
-    大佐: 'defender', 中佐: 'defender', 少佐: 'defender', 大尉: 'defender', 中尉: 'defender', 少尉: 'defender',
-    騎兵: 'defender', 工兵: 'defender', スパイ: 'defender', 地雷: 'defender', 軍旗: 'draw'
-  }
+  大将: { 大将: 'draw', 中将: 'attacker', 少将: 'attacker', 飛行機: 'attacker', タンク: 'attacker', 大佐: 'attacker', 中佐: 'attacker', 少佐: 'attacker', 大尉: 'attacker', 中尉: 'attacker', 少尉: 'attacker', 騎兵: 'attacker', 工兵: 'attacker', スパイ: 'defender', 地雷: 'draw', 軍旗: 'attacker' },
+  中将: { 大将: 'defender', 中将: 'draw', 少将: 'attacker', 飛行機: 'attacker', タンク: 'attacker', 大佐: 'attacker', 中佐: 'attacker', 少佐: 'attacker', 大尉: 'attacker', 中尉: 'attacker', 少尉: 'attacker', 騎兵: 'attacker', 工兵: 'attacker', スパイ: 'attacker', 地雷: 'draw', 軍旗: 'attacker' },
+  少将: { 大将: 'defender', 中将: 'defender', 少将: 'draw', 飛行機: 'attacker', タンク: 'attacker', 大佐: 'attacker', 中佐: 'attacker', 少佐: 'attacker', 大尉: 'attacker', 中尉: 'attacker', 少尉: 'attacker', 騎兵: 'attacker', 工兵: 'attacker', スパイ: 'attacker', 地雷: 'draw', 軍旗: 'attacker' },
+  飛行機: { 大将: 'defender', 中将: 'defender', 少将: 'defender', 飛行機: 'draw', タンク: 'attacker', 大佐: 'attacker', 中佐: 'attacker', 少佐: 'attacker', 大尉: 'attacker', 中尉: 'attacker', 少尉: 'attacker', 騎兵: 'attacker', 工兵: 'attacker', スパイ: 'attacker', 地雷: 'attacker', 軍旗: 'attacker' },
+  タンク: { 大将: 'defender', 中将: 'defender', 少将: 'defender', 飛行機: 'defender', タンク: 'draw', 大佐: 'attacker', 中佐: 'attacker', 少佐: 'attacker', 大尉: 'attacker', 中尉: 'attacker', 少尉: 'attacker', 騎兵: 'attacker', 工兵: 'attacker', スパイ: 'attacker', 地雷: 'draw', 軍旗: 'attacker' },
+  大佐: { 大将: 'defender', 中将: 'defender', 少将: 'defender', 飛行機: 'defender', タンク: 'defender', 大佐: 'draw', 中佐: 'attacker', 少佐: 'attacker', 大尉: 'attacker', 中尉: 'attacker', 少尉: 'attacker', 騎兵: 'attacker', 工兵: 'attacker', スパイ: 'attacker', 地雷: 'draw', 軍旗: 'attacker' },
+  中佐: { 大将: 'defender', 中将: 'defender', 少将: 'defender', 飛行機: 'defender', タンク: 'defender', 大佐: 'defender', 中佐: 'draw', 少佐: 'attacker', 大尉: 'attacker', 中尉: 'attacker', 少尉: 'attacker', 騎兵: 'attacker', 工兵: 'attacker', スパイ: 'attacker', 地雷: 'draw', 軍旗: 'attacker' },
+  少佐: { 大将: 'defender', 中将: 'defender', 少将: 'defender', 飛行機: 'defender', タンク: 'defender', 大佐: 'defender', 中佐: 'defender', 少佐: 'draw', 大尉: 'attacker', 中尉: 'attacker', 少尉: 'attacker', 騎兵: 'attacker', 工兵: 'attacker', スパイ: 'attacker', 地雷: 'draw', 軍旗: 'attacker' },
+  大尉: { 大将: 'defender', 中将: 'defender', 少将: 'defender', 飛行機: 'defender', タンク: 'defender', 大佐: 'defender', 中佐: 'defender', 少佐: 'defender', 大尉: 'draw', 中尉: 'attacker', 少尉: 'attacker', 騎兵: 'attacker', 工兵: 'attacker', スパイ: 'attacker', 地雷: 'draw', 軍旗: 'attacker' },
+  中尉: { 大将: 'defender', 中将: 'defender', 少将: 'defender', 飛行機: 'defender', タンク: 'defender', 大佐: 'defender', 中佐: 'defender', 少佐: 'defender', 大尉: 'defender', 中尉: 'draw', 少尉: 'attacker', 騎兵: 'attacker', 工兵: 'attacker', スパイ: 'attacker', 地雷: 'draw', 軍旗: 'attacker' },
+  少尉: { 大将: 'defender', 中将: 'defender', 少将: 'defender', 飛行機: 'defender', タンク: 'defender', 大佐: 'defender', 中佐: 'defender', 少佐: 'defender', 大尉: 'defender', 中尉: 'defender', 少尉: 'draw', 騎兵: 'attacker', 工兵: 'attacker', スパイ: 'attacker', 地雷: 'draw', 軍旗: 'attacker' },
+  騎兵: { 大将: 'defender', 中将: 'defender', 少将: 'defender', 飛行機: 'defender', タンク: 'defender', 大佐: 'defender', 中佐: 'defender', 少佐: 'defender', 大尉: 'defender', 中尉: 'defender', 少尉: 'defender', 騎兵: 'draw', 工兵: 'attacker', スパイ: 'attacker', 地雷: 'draw', 軍旗: 'attacker' },
+  工兵: { 大将: 'defender', 中将: 'defender', 少将: 'defender', 飛行機: 'defender', タンク: 'defender', 大佐: 'defender', 中佐: 'defender', 少佐: 'defender', 大尉: 'defender', 中尉: 'defender', 少尉: 'defender', 騎兵: 'defender', 工兵: 'draw', スパイ: 'attacker', 地雷: 'attacker', 軍旗: 'attacker' },
+  スパイ: { 大将: 'attacker', 中将: 'defender', 少将: 'defender', 飛行機: 'defender', タンク: 'defender', 大佐: 'defender', 中佐: 'defender', 少佐: 'defender', 大尉: 'defender', 中尉: 'defender', 少尉: 'defender', 騎兵: 'defender', 工兵: 'defender', スパイ: 'draw', 地雷: 'draw', 軍旗: 'attacker' },
+  地雷: { 大将: 'draw', 中将: 'draw', 少将: 'draw', 飛行機: 'defender', タンク: 'draw', 大佐: 'draw', 中佐: 'draw', 少佐: 'draw', 大尉: 'draw', 中尉: 'draw', 少尉: 'draw', 騎兵: 'draw', 工兵: 'defender', スパイ: 'draw', 地雷: 'draw', 軍旗: 'draw' },
+  軍旗: { 大将: 'defender', 中将: 'defender', 少将: 'defender', 飛行機: 'defender', タンク: 'defender', 大佐: 'defender', 中佐: 'defender', 少佐: 'defender', 大尉: 'defender', 中尉: 'defender', 少尉: 'defender', 騎兵: 'defender', 工兵: 'defender', スパイ: 'defender', 地雷: 'defender', 軍旗: 'draw' }
 }
 
 export function judgeBattle(
@@ -200,6 +134,33 @@ export function getValidAdjacentPositions(
     const norm = normalizePos(vx, vy)
     if (!valid.some((p) => p.x === norm.x && p.y === norm.y)) {
       valid.push(norm)
+    }
+  }
+
+  // 1. 総司令部（2マス結合ブロック）からの前進・左右展開補填
+  const isHQ = (x === 3 && (y === 0 || y === 6))
+  if (isHQ) {
+    const forwardY = (myOwner === 'player1') ? y - 1 : y + 1
+    const hqCandidates: Position[] = [
+      { x: 3, y: forwardY }, // 前方右マス
+      { x: 4, y: forwardY }, // 前方左マス
+      { x: 2, y },           // 左外側マス
+      { x: 5, y },           // 右外側マス
+    ]
+
+    for (const cand of hqCandidates) {
+      if (cand.x >= 0 && cand.x <= 7 && cand.y >= 0 && cand.y <= 6) {
+        if (!isRiverCell(cand.x, cand.y)) {
+          const norm = normalizePos(cand.x, cand.y)
+          const occ = boardState[`${norm.x}-${norm.y}`]
+          if (!occ || occ.owner !== myOwner) {
+            addValidPos(cand.x, cand.y)
+          }
+        }
+      }
+    }
+    if (piece !== '飛行機' && piece !== '工兵' && piece !== 'タンク' && piece !== '騎兵') {
+      return valid
     }
   }
 

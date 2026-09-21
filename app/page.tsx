@@ -166,11 +166,28 @@ export default function Home() {
     setIsWinResult(isWin)
     setShowResultModal(true)
 
+    // 1. ローカルキャッシュに保存（即時反省用）
     try {
-      await supabase.from('gunjin_scores').insert([
-        { user_id: user.id, user_name: user.name, points }
-      ])
+      const localData = localStorage.getItem('gunjin_local_scores')
+      const scores = localData ? JSON.parse(localData) : []
+      scores.push({ user_name: user.name, points, created_at: new Date().toISOString() })
+      localStorage.setItem('gunjin_local_scores', JSON.stringify(scores))
     } catch (e) {}
+
+    // 2. Supabase へ送信 (UUIDエラー回避)
+    try {
+      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(user.id)
+      const payload: any = {
+        user_name: user.name,
+        points,
+      }
+      if (isUuid) {
+        payload.user_id = user.id
+      }
+      await supabase.from('gunjin_scores').insert([payload])
+    } catch (e) {
+      console.warn('DBスコア登録例外:', e)
+    }
   }
 
   const addLog = (msg: string) => {
@@ -386,7 +403,6 @@ export default function Home() {
         newMyBoard[internalKey] = movingPiece
         newLogMsg = `自軍の【${movingPiece}】が移動しました。`
       } else {
-        // 軍旗背後駒の強さを判定へ渡す
         const defenderOwner = myRole === 'player1' ? 'player2' : 'player1'
         const defenderBehind = getBehindPiece(internalKey, defenderOwner, boardState)
         battleRes = judgeBattle(movingPiece, targetEnemyPiece, defenderBehind)
