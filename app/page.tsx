@@ -104,7 +104,6 @@ export default function Home() {
     }
   }, [mode])
 
-  // オンライン通信（セッション維持＆リアルタイム同期）
   useEffect(() => {
     if (!activeRoomId || !isOnlineMatch) return
 
@@ -167,7 +166,6 @@ export default function Home() {
     setIsWinResult(isWin)
     setShowResultModal(true)
 
-    // ローカルキャッシュ保存
     try {
       const localData = localStorage.getItem('gunjin_local_scores')
       const scores = localData ? JSON.parse(localData) : []
@@ -175,7 +173,6 @@ export default function Home() {
       localStorage.setItem('gunjin_local_scores', JSON.stringify(scores))
     } catch (e) {}
 
-    // DB保存
     try {
       const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(user.id)
       const payload: any = {
@@ -525,6 +522,8 @@ export default function Home() {
 
   return (
     <main className="min-h-screen bg-[#f7f1e3] p-3 md:p-6 font-sans select-none">
+      
+      {/* ===== 画面上部ヘッダー ===== */}
       <div className="max-w-3xl mx-auto text-center mb-4">
         <div className="flex justify-center mb-2">
           {!logoError ? (
@@ -543,9 +542,20 @@ export default function Home() {
         <h1 className="text-xl md:text-2xl font-black text-[#b71c1c]">
           軍人将棋（弐拾参枚型 電脳対局場）
         </h1>
-        <p className="font-bold text-gray-800 text-xs md:text-sm mt-0.5">
+        <p className="font-bold text-gray-800 text-xs md:text-sm mt-0.5 mb-2">
           対局武将: <span className="text-[#b71c1c] font-black">{user.name}</span> 殿
         </p>
+
+        {/* 勝利条件の復活 */}
+        <div className="inline-block bg-[#fcf8f2] border border-[#c9a063] px-4 py-2 rounded-lg shadow-sm text-left">
+          <p className="text-xs md:text-sm font-black text-[#b71c1c] mb-1 border-b border-[#c9a063] pb-0.5">
+            🎌 勝利条件
+          </p>
+          <p className="text-[11px] md:text-xs font-bold text-gray-800 leading-relaxed">
+            ① 敵軍の<span className="text-[#b71c1c]">「総司令部」</span>に自軍の駒で突入・占領する<br />
+            ② 敵軍の<span className="text-[#b71c1c]">「軍旗」</span>を攻撃して撃破する
+          </p>
+        </div>
       </div>
 
       {mode === 'lobby' && (
@@ -760,7 +770,7 @@ export default function Home() {
         </div>
       )}
 
-      {/* 100%正確なHTML/React版のルール＆星取り表コンポーネントを表示 */}
+      {/* 新しく作成した完璧なルール＆勝敗表ガイドを表示 */}
       <RuleGuide />
 
       {showRanking && <RankingModal onClose={() => setShowRanking(false)} />}
