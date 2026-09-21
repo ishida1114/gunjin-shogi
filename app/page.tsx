@@ -6,6 +6,7 @@ import PieceSetup from '@/app/components/PieceSetup'
 import GameBoard from '@/app/components/GameBoard'
 import RankingModal from '@/app/components/RankingModal'
 import ResultModal from '@/app/components/ResultModal'
+import RuleGuide from '@/app/components/RuleGuide'
 import { supabase } from '@/app/lib/supabaseClient'
 import {
   Piece,
@@ -57,7 +58,6 @@ export default function Home() {
   const [logs, setLogs] = useState<string[]>([])
 
   const [logoError, setLogoError] = useState(false)
-  const [ruleImgError, setRuleImgError] = useState(false)
 
   const channelRef = useRef<any>(null)
 
@@ -104,6 +104,7 @@ export default function Home() {
     }
   }, [mode])
 
+  // オンライン通信（セッション維持＆リアルタイム同期）
   useEffect(() => {
     if (!activeRoomId || !isOnlineMatch) return
 
@@ -166,7 +167,7 @@ export default function Home() {
     setIsWinResult(isWin)
     setShowResultModal(true)
 
-    // 1. ローカルキャッシュに保存（即時反省用）
+    // ローカルキャッシュ保存
     try {
       const localData = localStorage.getItem('gunjin_local_scores')
       const scores = localData ? JSON.parse(localData) : []
@@ -174,7 +175,7 @@ export default function Home() {
       localStorage.setItem('gunjin_local_scores', JSON.stringify(scores))
     } catch (e) {}
 
-    // 2. Supabase へ送信 (UUIDエラー回避)
+    // DB保存
     try {
       const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(user.id)
       const payload: any = {
@@ -185,9 +186,7 @@ export default function Home() {
         payload.user_id = user.id
       }
       await supabase.from('gunjin_scores').insert([payload])
-    } catch (e) {
-      console.warn('DBスコア登録例外:', e)
-    }
+    } catch (e) {}
   }
 
   const addLog = (msg: string) => {
@@ -761,28 +760,8 @@ export default function Home() {
         </div>
       )}
 
-      <div className="max-w-3xl mx-auto mt-8 bg-[#fcf8f2] border-2 border-[#c9a063] rounded-lg p-3 md:p-5 shadow-md">
-        <h2 className="text-sm md:text-base font-black text-[#b71c1c] mb-3 border-b border-[#c9a063] pb-1">
-          📜 コマの動かし方・相克表ガイド
-        </h2>
-        <div className="flex justify-center">
-          {!ruleImgError ? (
-            <img
-              src="/images/rule.webp"
-              alt="軍人将棋 ルール・相克表解説"
-              className="w-full max-w-xl rounded border border-[#c9a063] shadow-sm my-2"
-              onError={() => setRuleImgError(true)}
-            />
-          ) : (
-            <div className="w-full bg-amber-50 p-4 rounded border border-amber-300 text-xs font-bold text-gray-800 space-y-2">
-              <p className="text-[#b71c1c] font-black text-sm text-center">【相克関係（強弱）】</p>
-              <p className="leading-relaxed">
-                大将 ＞ 中将 ＞ 少将 ＞ 大佐 ＞ 中佐 ＞ 少佐 ＞ 大尉 ＞ 中尉 ＞ 少尉 ＞ 飛行機 ＞ タンク ＞ 騎兵 ＞ 工兵 ＞ スパイ
-              </p>
-            </div>
-          )}
-        </div>
-      </div>
+      {/* 100%正確なHTML/React版のルール＆星取り表コンポーネントを表示 */}
+      <RuleGuide />
 
       {showRanking && <RankingModal onClose={() => setShowRanking(false)} />}
       
