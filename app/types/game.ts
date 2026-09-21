@@ -37,7 +37,6 @@ export const PIECE_LABELS: Record<PieceType, string> = {
   工兵: '工兵', スパイ: 'スパイ', 地雷: '地雷', 軍旗: '軍旗',
 }
 
-// 座標を内部標準(左側のx=3)に完全正規化し、消失バグを防ぐ
 export function normalizePos(x: number, y: number): Position {
   if (y === 0 && x === 4) return { x: 3, y: 0 }
   if (y === 6 && x === 4) return { x: 3, y: 6 }
@@ -92,9 +91,8 @@ export function getValidAdjacentPositions(
     }
   }
 
-  const forwardDir = (myOwner === 'player1') ? { x: 0, y: -1 } : { x: 0, y: 1 }
   const directions = piece === '騎兵' 
-    ? [forwardDir] 
+    ? [{ x: 0, y: -1 }, { x: 0, y: 1 }] 
     : [{ x: 0, y: -1 }, { x: 0, y: 1 }, { x: -1, y: 0 }, { x: 1, y: 0 }]
 
   const isTargetEnemyHQ = (tx: number, ty: number) => {
@@ -179,15 +177,20 @@ export function isValidMove(
   return validMoves.some((m) => m.x === to.x && m.y === to.y)
 }
 
+// 戦闘勝敗判定関数（飛行機が尉官・佐官・将官に勝利するよう修正）
 export function judgeBattle(
   attacker: PieceType,
   defender: PieceType
 ): 'attacker' | 'defender' | 'draw' {
   if (attacker === defender) return 'draw'
+
+  // 地雷判定（工兵・飛行機は地雷を撤去して勝利）
   if (defender === '地雷') {
     if (attacker === '工兵' || attacker === '飛行機') return 'attacker'
     return 'defender'
   }
+
+  // スパイ判定（大将にのみ勝利）
   if (attacker === 'スパイ') {
     if (defender === '大将') return 'attacker'
     return 'defender'
@@ -196,9 +199,19 @@ export function judgeBattle(
     if (attacker === '大将') return 'defender'
     return 'attacker'
   }
+
+  // 飛行機ルール修正：地雷（上記で判定済）以外の全コマ（尉官・佐官・将官含む）に勝利
+  if (attacker === '飛行機') {
+    return 'attacker'
+  }
+  if (defender === '飛行機') {
+    return 'defender'
+  }
+
+  // 階級順位表（通常の陸上駒同士の対戦）
   const rankOrder: PieceType[] = [
     '大将', '中将', '少将', '大佐', '中佐', '少佐',
-    '大尉', '中尉', '少尉', '飛行機', 'タンク', '騎兵', '工兵'
+    '大尉', '中尉', '少尉', 'タンク', '騎兵', '工兵'
   ]
   const aIndex = rankOrder.indexOf(attacker)
   const dIndex = rankOrder.indexOf(defender)
@@ -208,6 +221,8 @@ export function judgeBattle(
     if (aIndex > dIndex) return 'defender'
     return 'draw'
   }
+
   if (defender === '軍旗') return 'attacker'
+
   return 'attacker'
 }

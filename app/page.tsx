@@ -60,6 +60,18 @@ export default function Home() {
 
   const channelRef = useRef<any>(null)
 
+  // 【重要】通信切断を防ぐため、最新の盤面状態を保持するRef
+  const p1BoardRef = useRef(p1Board)
+  const p2BoardRef = useRef(p2Board)
+
+  useEffect(() => {
+    p1BoardRef.current = p1Board
+  }, [p1Board])
+
+  useEffect(() => {
+    p2BoardRef.current = p2Board
+  }, [p2Board])
+
   const flipKey = (key: string): string => {
     const [x, y] = key.split('-').map(Number)
     return `${7 - x}-${6 - y}`
@@ -92,6 +104,7 @@ export default function Home() {
     }
   }, [mode])
 
+  // 修正：通信が切れないよう、依存配列から盤面ステートを除外
   useEffect(() => {
     if (!activeRoomId || !isOnlineMatch) return
 
@@ -108,11 +121,12 @@ export default function Home() {
             setIsWaitingOpponent(false)
             addLog('⚔️ 対戦相手が参戦し陣形を布きました！対局開始です！')
 
+            // Refから最新の自分の盤面を取得して送る
             channel.send({
               type: 'broadcast',
               event: 'SYNC_FULL_STATE',
               payload: {
-                p1Board,
+                p1Board: p1BoardRef.current,
                 p2Board: newP2,
                 turn: 'player1',
                 logs: ['⚔️ 対戦相手が参戦しました！対局開始です！'],
@@ -145,7 +159,7 @@ export default function Home() {
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [activeRoomId, isOnlineMatch, myRole, p1Board])
+  }, [activeRoomId, isOnlineMatch, myRole]) // ← これで通信の切断・再接続が起きなくなりました！
 
   const saveScore = async (isWin: boolean) => {
     if (!user) return
