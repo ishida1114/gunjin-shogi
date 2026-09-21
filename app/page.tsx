@@ -523,18 +523,18 @@ export default function Home() {
   return (
     <main className="min-h-screen bg-[#f7f1e3] p-3 md:p-6 font-sans select-none">
       
-      {/* ===== 画面上部ヘッダー ===== */}
-      <div className="max-w-3xl mx-auto text-center mb-4">
-        <div className="flex justify-center mb-2">
+      {/* ===== 画面上部ヘッダー（ロゴ拡大版） ===== */}
+      <div className="max-w-3xl mx-auto text-center mb-6">
+        <div className="flex justify-center mb-3">
           {!logoError ? (
             <img
               src="/images/gunjin_shogi_logo.webp"
               alt="軍人将棋"
-              className="h-24 md:h-36 object-contain drop-shadow mx-auto transition-all"
+              className="h-36 md:h-52 object-contain drop-shadow-2xl mx-auto transition-transform hover:scale-105"
               onError={() => setLogoError(true)}
             />
           ) : (
-            <div className="text-3xl font-black text-[#b71c1c] tracking-widest border-b-2 border-[#b71c1c] pb-0.5">
+            <div className="text-4xl font-black text-[#b71c1c] tracking-widest border-b-4 border-[#b71c1c] pb-1">
               軍人将棋
             </div>
           )}
@@ -542,11 +542,11 @@ export default function Home() {
         <h1 className="text-xl md:text-2xl font-black text-[#b71c1c]">
           軍人将棋（弐拾参枚型 電脳対局場）
         </h1>
-        <p className="font-bold text-gray-800 text-xs md:text-sm mt-0.5 mb-2">
+        <p className="font-bold text-gray-800 text-xs md:text-sm mt-0.5 mb-3">
           対局武将: <span className="text-[#b71c1c] font-black">{user.name}</span> 殿
         </p>
 
-        {/* 勝利条件の復活 */}
+        {/* 勝利条件ガイド */}
         <div className="inline-block bg-[#fcf8f2] border border-[#c9a063] px-4 py-2 rounded-lg shadow-sm text-left">
           <p className="text-xs md:text-sm font-black text-[#b71c1c] mb-1 border-b border-[#c9a063] pb-0.5">
             🎌 勝利条件
@@ -770,7 +770,7 @@ export default function Home() {
         </div>
       )}
 
-      {/* 新しく作成した完璧なルール＆勝敗表ガイドを表示 */}
+      {/* HTML/React完全版ルール＆相克表 */}
       <RuleGuide />
 
       {showRanking && <RankingModal onClose={() => setShowRanking(false)} />}
