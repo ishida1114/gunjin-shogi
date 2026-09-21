@@ -14,6 +14,7 @@ import {
   canOccupyHQ,
   getValidAdjacentPositions,
   judgeBattle,
+  getBehindPiece,
   normalizeKey,
   normalizePos,
 } from '@/app/types/game'
@@ -60,7 +61,6 @@ export default function Home() {
 
   const channelRef = useRef<any>(null)
 
-  // 【重要】通信切断を防ぐため、最新の盤面状態を保持するRef
   const p1BoardRef = useRef(p1Board)
   const p2BoardRef = useRef(p2Board)
 
@@ -104,7 +104,6 @@ export default function Home() {
     }
   }, [mode])
 
-  // 修正：通信が切れないよう、依存配列から盤面ステートを除外
   useEffect(() => {
     if (!activeRoomId || !isOnlineMatch) return
 
@@ -121,7 +120,6 @@ export default function Home() {
             setIsWaitingOpponent(false)
             addLog('⚔️ 対戦相手が参戦し陣形を布きました！対局開始です！')
 
-            // Refから最新の自分の盤面を取得して送る
             channel.send({
               type: 'broadcast',
               event: 'SYNC_FULL_STATE',
@@ -159,7 +157,7 @@ export default function Home() {
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [activeRoomId, isOnlineMatch, myRole]) // ← これで通信の切断・再接続が起きなくなりました！
+  }, [activeRoomId, isOnlineMatch, myRole])
 
   const saveScore = async (isWin: boolean) => {
     if (!user) return
@@ -388,7 +386,10 @@ export default function Home() {
         newMyBoard[internalKey] = movingPiece
         newLogMsg = `自軍の【${movingPiece}】が移動しました。`
       } else {
-        battleRes = judgeBattle(movingPiece, targetEnemyPiece)
+        // 軍旗背後駒の強さを判定へ渡す
+        const defenderOwner = myRole === 'player1' ? 'player2' : 'player1'
+        const defenderBehind = getBehindPiece(internalKey, defenderOwner, boardState)
+        battleRes = judgeBattle(movingPiece, targetEnemyPiece, defenderBehind)
 
         if (battleRes === 'attacker') {
           newMyBoard[internalKey] = movingPiece

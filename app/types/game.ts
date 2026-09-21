@@ -74,6 +74,53 @@ export function canOccupyHQ(piece: PieceType): boolean {
   return !cannot.includes(piece)
 }
 
+// 防御側駒の「すぐ後ろの駒」を取得する補助関数（軍旗用）
+export function getBehindPiece(
+  defenderKey: string,
+  defenderOwner: string,
+  boardState: Record<string, { type: PieceType; owner: string }>
+): PieceType | undefined {
+  const normKey = normalizeKey(defenderKey)
+  const [x, y] = normKey.split('-').map(Number)
+  const behindY = defenderOwner === 'player1' ? y + 1 : y - 1
+  const behindKey = normalizeKey(`${x}-${behindY}`)
+  return boardState[behindKey]?.type
+}
+
+// 23枚型 勝ち負け早見表に基づく全相克マトリックス (〇=attacker, ×=defender, ==draw)
+const BATTLE_MATRIX: Record<PieceType, Record<PieceType, 'attacker' | 'defender' | 'draw'>> = {
+  大将: { 大将: 'draw', 中将: 'attacker', 少将: 'attacker', 大佐: 'attacker', 中佐: 'attacker', 少佐: 'attacker', 大尉: 'attacker', 中尉: 'attacker', 少尉: 'attacker', 飛行機: 'attacker', タンク: 'attacker', 騎兵: 'attacker', 工兵: 'attacker', スパイ: 'defender', 地雷: 'draw', 軍旗: 'attacker' },
+  中将: { 大将: 'defender', 中将: 'draw', 少将: 'attacker', 大佐: 'attacker', 中佐: 'attacker', 少佐: 'attacker', 大尉: 'attacker', 中尉: 'attacker', 少尉: 'attacker', 飛行機: 'attacker', タンク: 'attacker', 騎兵: 'attacker', 工兵: 'attacker', スパイ: 'attacker', 地雷: 'draw', 軍旗: 'attacker' },
+  少将: { 大将: 'defender', 中将: 'defender', 少将: 'draw', 大佐: 'attacker', 中佐: 'attacker', 少佐: 'attacker', 大尉: 'attacker', 中尉: 'attacker', 少尉: 'attacker', 飛行機: 'attacker', タンク: 'attacker', 騎兵: 'attacker', 工兵: 'attacker', スパイ: 'attacker', 地雷: 'draw', 軍旗: 'attacker' },
+  大佐: { 大将: 'defender', 中将: 'defender', 少将: 'defender', 大佐: 'draw', 中佐: 'attacker', 少佐: 'attacker', 大尉: 'attacker', 中尉: 'attacker', 少尉: 'attacker', 飛行機: 'defender', タンク: 'defender', 騎兵: 'attacker', 工兵: 'attacker', スパイ: 'attacker', 地雷: 'draw', 軍旗: 'attacker' },
+  中佐: { 大将: 'defender', 中将: 'defender', 少将: 'defender', 大佐: 'defender', 中佐: 'draw', 少佐: 'attacker', 大尉: 'attacker', 中尉: 'attacker', 少尉: 'attacker', 飛行機: 'defender', タンク: 'defender', 騎兵: 'attacker', 工兵: 'attacker', スパイ: 'attacker', 地雷: 'draw', 軍旗: 'attacker' },
+  少佐: { 大将: 'defender', 中将: 'defender', 少将: 'defender', 大佐: 'defender', 中佐: 'defender', 少佐: 'draw', 大尉: 'attacker', 中尉: 'attacker', 少尉: 'attacker', 飛行機: 'defender', タンク: 'defender', 騎兵: 'attacker', 工兵: 'attacker', スパイ: 'attacker', 地雷: 'draw', 軍旗: 'attacker' },
+  大尉: { 大将: 'defender', 中将: 'defender', 少将: 'defender', 大佐: 'defender', 中佐: 'defender', 少佐: 'defender', 大尉: 'draw', 中尉: 'attacker', 少尉: 'attacker', 飛行機: 'defender', タンク: 'defender', 騎兵: 'attacker', 工兵: 'attacker', スパイ: 'attacker', 地雷: 'draw', 軍旗: 'attacker' },
+  中尉: { 大将: 'defender', 中将: 'defender', 少将: 'defender', 大佐: 'defender', 中佐: 'defender', 少佐: 'defender', 大尉: 'defender', 中尉: 'draw', 少尉: 'attacker', 飛行機: 'defender', タンク: 'defender', 騎兵: 'attacker', 工兵: 'attacker', スパイ: 'attacker', 地雷: 'draw', 軍旗: 'attacker' },
+  少尉: { 大将: 'defender', 中将: 'defender', 少将: 'defender', 大佐: 'defender', 中佐: 'defender', 少佐: 'defender', 大尉: 'defender', 中尉: 'defender', 少尉: 'draw', 飛行機: 'defender', タンク: 'defender', 騎兵: 'attacker', 工兵: 'attacker', スパイ: 'attacker', 地雷: 'draw', 軍旗: 'attacker' },
+  飛行機: { 大将: 'defender', 中将: 'defender', 少将: 'defender', 大佐: 'attacker', 中佐: 'attacker', 少佐: 'attacker', 大尉: 'attacker', 中尉: 'attacker', 少尉: 'attacker', 飛行機: 'draw', タンク: 'attacker', 騎兵: 'attacker', 工兵: 'attacker', スパイ: 'attacker', 地雷: 'attacker', 軍旗: 'attacker' },
+  タンク: { 大将: 'defender', 中将: 'defender', 少将: 'defender', 大佐: 'defender', 中佐: 'defender', 少佐: 'defender', 大尉: 'attacker', 中尉: 'attacker', 少尉: 'attacker', 飛行機: 'defender', タンク: 'draw', 騎兵: 'attacker', 工兵: 'defender', スパイ: 'attacker', 地雷: 'draw', 軍旗: 'attacker' },
+  騎兵: { 大将: 'defender', 中将: 'defender', 少将: 'defender', 大佐: 'defender', 中佐: 'defender', 少佐: 'defender', 大尉: 'defender', 中尉: 'defender', 少尉: 'defender', 飛行機: 'defender', タンク: 'defender', 騎兵: 'draw', 工兵: 'attacker', スパイ: 'attacker', 地雷: 'draw', 軍旗: 'attacker' },
+  工兵: { 大将: 'defender', 中将: 'defender', 少将: 'defender', 大佐: 'defender', 中佐: 'defender', 少佐: 'defender', 大尉: 'defender', 中尉: 'defender', 少尉: 'defender', 飛行機: 'defender', タンク: 'attacker', 騎兵: 'defender', 工兵: 'draw', スパイ: 'attacker', 地雷: 'attacker', 軍旗: 'attacker' },
+  スパイ: { 大将: 'attacker', 中将: 'defender', 少将: 'defender', 大佐: 'defender', 中佐: 'defender', 少佐: 'defender', 大尉: 'defender', 中尉: 'defender', 少尉: 'defender', 飛行機: 'defender', タンク: 'defender', 騎兵: 'defender', 工兵: 'defender', スパイ: 'draw', 地雷: 'draw', 軍旗: 'attacker' },
+  地雷: { 大将: 'draw', 中将: 'draw', 少将: 'draw', 大佐: 'draw', 中佐: 'draw', 少佐: 'draw', 大尉: 'draw', 中尉: 'draw', 少尉: 'draw', 飛行機: 'defender', タンク: 'draw', 騎兵: 'draw', 工兵: 'defender', スパイ: 'draw', 地雷: 'draw', 軍旗: 'draw' },
+  軍旗: { 大将: 'defender', 中将: 'defender', 少将: 'defender', 大佐: 'defender', 中佐: 'defender', 少佐: 'defender', 大尉: 'defender', 中尉: 'defender', 少尉: 'defender', 飛行機: 'defender', タンク: 'defender', 騎兵: 'defender', 工兵: 'defender', スパイ: 'defender', 地雷: 'defender', 軍旗: 'draw' },
+}
+
+export function judgeBattle(
+  attacker: PieceType,
+  defender: PieceType,
+  defenderBehind?: PieceType
+): 'attacker' | 'defender' | 'draw' {
+  if (defender === '軍旗') {
+    if (defenderBehind && defenderBehind !== '軍旗' && defenderBehind !== '地雷') {
+      return judgeBattle(attacker, defenderBehind)
+    }
+    return 'attacker'
+  }
+  return BATTLE_MATRIX[attacker]?.[defender] ?? 'attacker'
+}
+
 export function getValidAdjacentPositions(
   x: number,
   y: number,
@@ -86,14 +133,13 @@ export function getValidAdjacentPositions(
   const valid: Position[] = []
   const addValidPos = (vx: number, vy: number) => {
     const norm = normalizePos(vx, vy)
-    if (!valid.some(p => p.x === norm.x && p.y === norm.y)) {
+    if (!valid.some((p) => p.x === norm.x && p.y === norm.y)) {
       valid.push(norm)
     }
   }
 
-  const directions = piece === '騎兵' 
-    ? [{ x: 0, y: -1 }, { x: 0, y: 1 }] 
-    : [{ x: 0, y: -1 }, { x: 0, y: 1 }, { x: -1, y: 0 }, { x: 1, y: 0 }]
+  const forwardY = myOwner === 'player1' ? -1 : 1
+  const backwardY = myOwner === 'player1' ? 1 : -1
 
   const isTargetEnemyHQ = (tx: number, ty: number) => {
     const norm = normalizePos(tx, ty)
@@ -101,15 +147,69 @@ export function getValidAdjacentPositions(
     return norm.y === 6 && norm.x === 3
   }
 
-  if (piece === '飛行機') {
-    for (const dir of directions) {
+  // 騎兵・タンク：前に2マス、後ろ・左右に1マス
+  if (piece === '騎兵' || piece === 'タンク') {
+    // 1. 前1マス
+    const f1x = x
+    const f1y = y + forwardY
+    if (f1x >= 0 && f1x <= 7 && f1y >= 0 && f1y <= 6 && !isRiverCell(f1x, f1y)) {
+      if (!isTargetEnemyHQ(f1x, f1y) || canOccupyHQ(piece)) {
+        const norm1 = normalizePos(f1x, f1y)
+        const occ1 = boardState[`${norm1.x}-${norm1.y}`]
+        if (!occ1) {
+          addValidPos(f1x, f1y)
+          // 2. 前2マス（1マス目が空マスの場合のみ）
+          const f2x = x
+          const f2y = y + forwardY * 2
+          if (f2x >= 0 && f2x <= 7 && f2y >= 0 && f2y <= 6 && !isRiverCell(f2x, f2y)) {
+            if (!isTargetEnemyHQ(f2x, f2y) || canOccupyHQ(piece)) {
+              const norm2 = normalizePos(f2x, f2y)
+              const occ2 = boardState[`${norm2.x}-${norm2.y}`]
+              if (!occ2 || occ2.owner !== myOwner) {
+                addValidPos(f2x, f2y)
+              }
+            }
+          }
+        } else if (occ1.owner !== myOwner) {
+          addValidPos(f1x, f1y)
+        }
+      }
+    }
+
+    // 後ろ1マス、左1マス、右1マス
+    const otherDirs = [
+      { x: 0, y: backwardY },
+      { x: -1, y: 0 },
+      { x: 1, y: 0 },
+    ]
+    for (const dir of otherDirs) {
+      const nx = x + dir.x
+      const ny = y + dir.y
+      if (nx >= 0 && nx <= 7 && ny >= 0 && ny <= 6 && !isRiverCell(nx, ny)) {
+        if (!isTargetEnemyHQ(nx, ny) || canOccupyHQ(piece)) {
+          const norm = normalizePos(nx, ny)
+          const occ = boardState[`${norm.x}-${norm.y}`]
+          if (!occ || occ.owner !== myOwner) {
+            addValidPos(nx, ny)
+          }
+        }
+      }
+    }
+  } else if (piece === '飛行機') {
+    // 横に何マスでも、前に何マスでも、後ろに1マス（途中の駒を飛び越えられる）
+    const longDirs = [
+      { x: 0, y: forwardY },
+      { x: -1, y: 0 },
+      { x: 1, y: 0 },
+    ]
+    for (const dir of longDirs) {
       let nx = x + dir.x
       let ny = y + dir.y
       while (nx >= 0 && nx <= 7 && ny >= 0 && ny <= 6) {
         const norm = normalizePos(nx, ny)
         const targetKey = `${norm.x}-${norm.y}`
         const occupant = boardState[targetKey]
-        
+
         if (!isRiverCell(nx, ny) && !isTargetEnemyHQ(nx, ny)) {
           if (!occupant) {
             addValidPos(nx, ny)
@@ -122,8 +222,26 @@ export function getValidAdjacentPositions(
         ny += dir.y
       }
     }
-  } else if (piece === '工兵' || piece === 'タンク' || piece === '騎兵') {
-    for (const dir of directions) {
+
+    // 後ろ：1マス
+    const bx = x
+    const by = y + backwardY
+    if (bx >= 0 && bx <= 7 && by >= 0 && by <= 6 && !isRiverCell(bx, by) && !isTargetEnemyHQ(bx, by)) {
+      const norm = normalizePos(bx, by)
+      const occupant = boardState[`${norm.x}-${norm.y}`]
+      if (!occupant || occupant.owner !== myOwner) {
+        addValidPos(bx, by)
+      }
+    }
+  } else if (piece === '工兵') {
+    // 上下左右に何マスでも（飛び越え不可）
+    const dirs = [
+      { x: 0, y: -1 },
+      { x: 0, y: 1 },
+      { x: -1, y: 0 },
+      { x: 1, y: 0 },
+    ]
+    for (const dir of dirs) {
       let nx = x + dir.x
       let ny = y + dir.y
       while (nx >= 0 && nx <= 7 && ny >= 0 && ny <= 6) {
@@ -147,7 +265,14 @@ export function getValidAdjacentPositions(
       }
     }
   } else {
-    for (const dir of directions) {
+    // 通常駒（大将〜少尉、スパイ）：前後左右1マス
+    const dirs = [
+      { x: 0, y: -1 },
+      { x: 0, y: 1 },
+      { x: -1, y: 0 },
+      { x: 1, y: 0 },
+    ]
+    for (const dir of dirs) {
       const nx = x + dir.x
       const ny = y + dir.y
       if (nx >= 0 && nx <= 7 && ny >= 0 && ny <= 6) {
@@ -175,54 +300,4 @@ export function isValidMove(
 ): boolean {
   const validMoves = getValidAdjacentPositions(from.x, from.y, piece, boardState, myOwner)
   return validMoves.some((m) => m.x === to.x && m.y === to.y)
-}
-
-// 戦闘勝敗判定関数（飛行機が尉官・佐官・将官に勝利するよう修正）
-export function judgeBattle(
-  attacker: PieceType,
-  defender: PieceType
-): 'attacker' | 'defender' | 'draw' {
-  if (attacker === defender) return 'draw'
-
-  // 地雷判定（工兵・飛行機は地雷を撤去して勝利）
-  if (defender === '地雷') {
-    if (attacker === '工兵' || attacker === '飛行機') return 'attacker'
-    return 'defender'
-  }
-
-  // スパイ判定（大将にのみ勝利）
-  if (attacker === 'スパイ') {
-    if (defender === '大将') return 'attacker'
-    return 'defender'
-  }
-  if (defender === 'スパイ') {
-    if (attacker === '大将') return 'defender'
-    return 'attacker'
-  }
-
-  // 飛行機ルール修正：地雷（上記で判定済）以外の全コマ（尉官・佐官・将官含む）に勝利
-  if (attacker === '飛行機') {
-    return 'attacker'
-  }
-  if (defender === '飛行機') {
-    return 'defender'
-  }
-
-  // 階級順位表（通常の陸上駒同士の対戦）
-  const rankOrder: PieceType[] = [
-    '大将', '中将', '少将', '大佐', '中佐', '少佐',
-    '大尉', '中尉', '少尉', 'タンク', '騎兵', '工兵'
-  ]
-  const aIndex = rankOrder.indexOf(attacker)
-  const dIndex = rankOrder.indexOf(defender)
-
-  if (aIndex !== -1 && dIndex !== -1) {
-    if (aIndex < dIndex) return 'attacker'
-    if (aIndex > dIndex) return 'defender'
-    return 'draw'
-  }
-
-  if (defender === '軍旗') return 'attacker'
-
-  return 'attacker'
 }

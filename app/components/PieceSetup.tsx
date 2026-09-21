@@ -8,7 +8,6 @@ interface PieceSetupProps {
   onCancel: () => void
 }
 
-// 弐拾参枚型の正しい構成（飛行機は2つ）
 const PIECE_LIST: PieceType[] = [
   '大将', '中将', '少将',
   '大佐', '中佐', '少佐',
@@ -17,21 +16,29 @@ const PIECE_LIST: PieceType[] = [
   '工兵', '工兵',
   'スパイ',
   '地雷', '地雷',
-  '軍旗', '少尉' 
-] // 合計23枚
+  '軍旗', '少尉'
+]
 
 export default function PieceSetup({ onComplete, onCancel }: PieceSetupProps) {
   const createInitialBoard = (): Record<string, PieceType> => {
-    const shuffled = [...PIECE_LIST].sort(() => Math.random() - 0.5)
-    const board: Record<string, PieceType> = {}
-    let idx = 0
-    for (let y = 4; y <= 6; y++) {
-      for (let x = 0; x <= 7; x++) {
-        // 総司令部の片側(4,6)は配置スキップ（実質3,6との結合として扱うため）
-        if (y === 6 && x === 4) continue
-        if (idx < shuffled.length) {
-          board[`${x}-${y}`] = shuffled[idx++]
+    let board: Record<string, PieceType> = {}
+    let isValidLayout = false
+
+    // 突入口前(2-4, 5-4)に地雷がないようシャッフル生成
+    while (!isValidLayout) {
+      const shuffled = [...PIECE_LIST].sort(() => Math.random() - 0.5)
+      board = {}
+      let idx = 0
+      for (let y = 4; y <= 6; y++) {
+        for (let x = 0; x <= 7; x++) {
+          if (y === 6 && x === 4) continue
+          if (idx < shuffled.length) {
+            board[`${x}-${y}`] = shuffled[idx++]
+          }
         }
+      }
+      if (board['2-4'] !== '地雷' && board['5-4'] !== '地雷') {
+        isValidLayout = true
       }
     }
     return board
@@ -46,7 +53,6 @@ export default function PieceSetup({ onComplete, onCancel }: PieceSetupProps) {
   }
 
   const handleCellClick = (x: number, y: number) => {
-    // 司令部結合部（4,6）のクリックは（3,6）へ転送
     if (y === 6 && x === 4) {
       x = 3
     }
@@ -91,7 +97,6 @@ export default function PieceSetup({ onComplete, onCancel }: PieceSetupProps) {
         <div className="grid grid-cols-8 gap-1">
           {[4, 5, 6].map((y) =>
             [7, 6, 5, 4, 3, 2, 1, 0].map((x) => {
-              // 4列目は描画スキップ（3列目でcol-span-2を使って描画する）
               if (y === 6 && x === 4) return null
               
               const key = `${x}-${y}`
@@ -104,7 +109,7 @@ export default function PieceSetup({ onComplete, onCancel }: PieceSetupProps) {
                   key={key}
                   onClick={() => handleCellClick(x, y)}
                   className={`h-12 rounded flex flex-col items-center justify-center font-black text-xs transition-all shadow-sm border ${
-                    isHQ ? 'col-span-2' : '' // 総司令部は2マス分の幅
+                    isHQ ? 'col-span-2' : ''
                   } ${
                     isSelected
                       ? 'bg-amber-300 border-amber-600 scale-105 z-10 ring-2 ring-amber-500'

@@ -4,51 +4,58 @@ import {
   judgeBattle,
   getValidAdjacentPositions,
   canOccupyHQ,
+  getBehindPiece,
 } from '@/app/types/game'
 
-// CPU用の初期23枚配置（敵陣 y=0~2）をランダム生成
+// CPU用の初期23枚配置（敵陣 y=0~2 / 突入口前 2-2, 5-2 に地雷禁止）
 export function generateAiBoard(): Record<string, PieceType> {
   const pieces: PieceType[] = [
     '大将', '中将', '少将',
     '大佐', '中佐', '少佐',
     '大尉', '中尉', '少尉', '少尉',
-    '飛行機', 'タンク', '騎兵',
+    '飛行機', '飛行機', 'タンク', 'タンク', '騎兵', '騎兵',
     '工兵', '工兵',
     'スパイ',
     '地雷', '地雷',
-    '軍旗', '少尉', '中尉', '大尉', '少佐'
+    '軍旗', '少尉'
   ]
 
-  // シャッフル
-  const shuffled = [...pieces].sort(() => Math.random() - 0.5)
+  let board: Record<string, PieceType> = {}
+  let isValidLayout = false
 
-  const board: Record<string, PieceType> = {}
-  let idx = 0
+  while (!isValidLayout) {
+    const shuffled = [...pieces].sort(() => Math.random() - 0.5)
+    board = {}
+    let idx = 0
 
-  // y=0 領域 (3,0 と 4,0 は総司令部のため 3-0 に配置)
-  for (let x = 0; x <= 7; x++) {
-    if (x === 4) continue
-    if (idx < shuffled.length) {
-      board[`${x}-0`] = shuffled[idx++]
+    // y=0 領域 (3-0配置)
+    for (let x = 0; x <= 7; x++) {
+      if (x === 4) continue
+      if (idx < shuffled.length) {
+        board[`${x}-0`] = shuffled[idx++]
+      }
     }
-  }
-  // y=1 領域
-  for (let x = 0; x <= 7; x++) {
-    if (idx < shuffled.length) {
-      board[`${x}-1`] = shuffled[idx++]
+    // y=1 領域
+    for (let x = 0; x <= 7; x++) {
+      if (idx < shuffled.length) {
+        board[`${x}-1`] = shuffled[idx++]
+      }
     }
-  }
-  // y=2 領域
-  for (let x = 0; x <= 7; x++) {
-    if (idx < shuffled.length) {
-      board[`${x}-2`] = shuffled[idx++]
+    // y=2 領域
+    for (let x = 0; x <= 7; x++) {
+      if (idx < shuffled.length) {
+        board[`${x}-2`] = shuffled[idx++]
+      }
+    }
+
+    if (board['2-2'] !== '地雷' && board['5-2'] !== '地雷') {
+      isValidLayout = true
     }
   }
 
   return board
 }
 
-// AIの思考ターン処理
 export function processAiTurn(
   p1Board: Record<string, PieceType>,
   p2Board: Record<string, PieceType>
@@ -72,7 +79,6 @@ export function processAiTurn(
     }
   }
 
-  // 移動可能なコマと移動先を算出
   const possibleMoves: { from: string; to: Position; piece: PieceType }[] = []
 
   for (const key of p2Keys) {
@@ -92,7 +98,6 @@ export function processAiTurn(
     }
   }
 
-  // ランダムに1つ選択
   const chosenMove = possibleMoves[Math.floor(Math.random() * possibleMoves.length)]
   const targetKey = `${chosenMove.to.x}-${chosenMove.to.y}`
   const targetP1Piece = p1Board[targetKey]
@@ -114,7 +119,9 @@ export function processAiTurn(
     newP2[targetKey] = chosenMove.piece
     logMsg = '敵軍が駒を進めました。'
   } else {
-    const battleRes = judgeBattle(chosenMove.piece, targetP1Piece)
+    // 軍旗背後駒の判定
+    const defenderBehind = getBehindPiece(targetKey, 'player1', boardState)
+    const battleRes = judgeBattle(chosenMove.piece, targetP1Piece, defenderBehind)
 
     if (battleRes === 'attacker') {
       newP2[targetKey] = chosenMove.piece
