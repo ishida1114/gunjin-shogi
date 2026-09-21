@@ -57,6 +57,7 @@ export function isHQCell(x: number, y: number): boolean {
   return isEnemyHQCell(x, y) || isMyHQCell(x, y)
 }
 
+// 本部を占領可能なコマ判定（飛行機・タンク・地雷・軍旗は不可）
 export function canOccupyHQ(piece: PieceType): boolean {
   const cannot = ['地雷', '軍旗', '飛行機', 'タンク']
   return !cannot.includes(piece)
@@ -73,7 +74,7 @@ export function getValidAdjacentPositions(
 
   const valid: Position[] = []
   
-  // 修正1：騎兵の移動（player1なら上 y:-1、player2なら下 y:1）
+  // 騎兵の前進方向（player1は上 y:-1、player2は下 y:1）
   const forwardDir = (myOwner === 'player1') ? { x: 0, y: -1 } : { x: 0, y: 1 }
   
   const directions = piece === '騎兵' 
@@ -85,8 +86,13 @@ export function getValidAdjacentPositions(
         { x: 1, y: 0 },
       ]
 
+  const isTargetEnemyHQ = (tx: number, ty: number) => {
+    if (myOwner === 'player1') return ty === 0 && (tx === 3 || tx === 4)
+    return ty === 6 && (tx === 3 || tx === 4)
+  }
+
   if (piece === '飛行機') {
-    // 修正3：飛行機（味方は飛び越えるが、敵駒のマスでストップ）
+    // 飛行機：味方は飛び越えるが、敵コマのマスで止まる（敵の飛越禁止）。本部は進入不可。
     for (const dir of directions) {
       let nx = x + dir.x
       let ny = y + dir.y
@@ -94,26 +100,29 @@ export function getValidAdjacentPositions(
         const targetKey = `${nx}-${ny}`
         const occupant = boardState[targetKey]
         
-        if (!isRiverCell(nx, ny)) {
+        // 川マス・敵本部マスには止まれない
+        if (!isRiverCell(nx, ny) && !isTargetEnemyHQ(nx, ny)) {
           if (!occupant) {
             valid.push({ x: nx, y: ny })
           } else if (occupant.owner !== myOwner) {
-            valid.push({ x: nx, y: ny }) // 敵駒のあるマスに着地（攻撃）
-            break // 敵駒は飛び越えずにここでストップ！
+            valid.push({ x: nx, y: ny }) // 敵コママスに着地して攻撃
+            break // 敵を飛び越えることはできない
           }
-          // 味方駒の場合はそのまま飛び越えて先へ進む
         }
         nx += dir.x
         ny += dir.y
       }
     }
   } else if (piece === '工兵' || piece === 'タンク' || piece === '騎兵') {
-    // 直線移動駒
+    // 直線移動コマ
     for (const dir of directions) {
       let nx = x + dir.x
       let ny = y + dir.y
       while (nx >= 0 && nx <= 7 && ny >= 0 && ny <= 6) {
-        if (isRiverCell(nx, ny)) break // 川は進めない
+        if (isRiverCell(nx, ny)) break // 川は侵入不可
+
+        // タンクや騎兵が敵本部へ入るのを禁止
+        if (isTargetEnemyHQ(nx, ny) && !canOccupyHQ(piece)) break
 
         const targetKey = `${nx}-${ny}`
         const occupant = boardState[targetKey]

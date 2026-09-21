@@ -257,7 +257,6 @@ export default function Home() {
         }
       }
     } else {
-      // 修正4：AI対戦時は同期待ちを強制解除して即時スタート
       setP1Board(setupBoard)
       const aiBoard = generateAiBoard()
       setP2Board(aiBoard)
@@ -265,7 +264,7 @@ export default function Home() {
       setValidMoves([])
       setLastMove(null)
       setTurn('player1')
-      setIsWaitingOpponent(false) // ロック解除
+      setIsWaitingOpponent(false)
       setMode('playing')
       setLogs(['陣形配置が完了しました。戦端が開かれます！'])
     }
@@ -321,7 +320,7 @@ export default function Home() {
     Object.entries(p2Board).forEach(([k, v]) => (boardState[k] = { type: v, owner: 'player2' }))
 
     if (myPiece) {
-      // 修正2：同じ駒のダブルタップ時は選択解除（消去防止）
+      // 選択中のコマを再度タップした時は選択解除（消去防止）
       if (selectedKey === internalKey) {
         setSelectedKey(null)
         setValidMoves([])

@@ -61,13 +61,12 @@ export default function GameBoard({
             return (
               <button
                 key={`${x}-${y}`}
-                // 修正５：本部への移動クリック時、有効な座標(3または4)を動的に判別して通信する
                 onClick={() => {
                   let targetX = x
                   if (isEnemyHQ || isMyHQ) {
                     if (isValidMoveCell(3, y)) targetX = 3
                     else if (isValidMoveCell(4, y)) targetX = 4
-                    else targetX = 3 // 移動時以外
+                    else targetX = 3
                   }
                   onCellClick(targetX, y)
                 }}
@@ -79,7 +78,7 @@ export default function GameBoard({
                     : isValidMove
                     ? 'bg-emerald-200 border-emerald-500 ring-2 ring-emerald-400 animate-pulse z-10'
                     : isLastMove
-                    ? 'bg-amber-100 border-amber-400'
+                    ? 'bg-amber-200 border-amber-500 ring-2 ring-amber-400 z-10' // 着手ハイライト
                     : piece
                     ? 'bg-[#fcf8f2] border-[#a87c4f]'
                     : isRiver
