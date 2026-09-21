@@ -14,6 +14,8 @@ import {
   canOccupyHQ,
   getValidAdjacentPositions,
   judgeBattle,
+  normalizeKey,
+  normalizePos,
 } from '@/app/types/game'
 import { generateAiBoard, processAiTurn } from '@/app/lib/ai'
 
@@ -239,7 +241,7 @@ export default function Home() {
       } else {
         const canonicalP2Board: Record<string, PieceType> = {}
         Object.entries(setupBoard).forEach(([k, v]) => {
-          canonicalP2Board[flipKey(k)] = v
+          canonicalP2Board[normalizeKey(flipKey(k))] = v
         })
         setP2Board(canonicalP2Board)
         setIsWaitingOpponent(true)
@@ -275,7 +277,7 @@ export default function Home() {
     
     Object.entries(p1Board).forEach(([key, type]) => {
       const renderKey = myRole === 'player2' ? flipKey(key) : key
-      const [x, y] = renderKey.split('-').map(Number)
+      const [x, y] = normalizeKey(renderKey).split('-').map(Number)
       list.push({
         id: `p1-${key}`,
         type,
@@ -287,7 +289,7 @@ export default function Home() {
     
     Object.entries(p2Board).forEach(([key, type]) => {
       const renderKey = myRole === 'player2' ? flipKey(key) : key
-      const [x, y] = renderKey.split('-').map(Number)
+      const [x, y] = normalizeKey(renderKey).split('-').map(Number)
       list.push({
         id: `p2-${key}`,
         type,
@@ -308,7 +310,8 @@ export default function Home() {
     if (!isMyTurn) return
 
     const renderKey = `${renderedX}-${renderedY}`
-    const internalKey = myRole === 'player2' ? flipKey(renderKey) : renderKey
+    const rawInternalKey = myRole === 'player2' ? flipKey(renderKey) : renderKey
+    const internalKey = normalizeKey(rawInternalKey)
     const [x, y] = internalKey.split('-').map(Number)
 
     const myBoard = myRole === 'player1' ? p1Board : p2Board
@@ -320,7 +323,6 @@ export default function Home() {
     Object.entries(p2Board).forEach(([k, v]) => (boardState[k] = { type: v, owner: 'player2' }))
 
     if (myPiece) {
-      // 選択中のコマを再度タップした時は選択解除（消去防止）
       if (selectedKey === internalKey) {
         setSelectedKey(null)
         setValidMoves([])
@@ -360,8 +362,8 @@ export default function Home() {
       let winnerRole = ''
 
       const isTargetHQ = myRole === 'player1'
-        ? (y === 0 && (x === 3 || x === 4))
-        : (y === 6 && (x === 3 || x === 4))
+        ? (y === 0 && x === 3)
+        : (y === 6 && x === 3)
 
       if (isTargetHQ && canOccupyHQ(movingPiece) && !targetEnemyPiece) {
         newMyBoard[internalKey] = movingPiece
@@ -466,7 +468,7 @@ export default function Home() {
   }
 
   const renderSelectedKey = selectedKey 
-    ? (myRole === 'player2' ? flipKey(selectedKey) : selectedKey)
+    ? (myRole === 'player2' ? normalizeKey(flipKey(selectedKey)) : selectedKey)
     : null
 
   const selectedPieceObject = renderSelectedKey && (myRole === 'player1' ? p1Board[selectedKey!] : p2Board[selectedKey!])
@@ -479,11 +481,14 @@ export default function Home() {
       }
     : null
 
-  const renderValidMoves = validMoves.map(pos => myRole === 'player2' ? flipPosition(pos) : pos)
+  const renderValidMoves = validMoves.map(pos => {
+    const raw = myRole === 'player2' ? flipPosition(pos) : pos
+    return normalizePos(raw.x, raw.y)
+  })
   
   const renderLastMove = lastMove ? {
-    from: myRole === 'player2' ? flipPosition(lastMove.from) : lastMove.from,
-    to: myRole === 'player2' ? flipPosition(lastMove.to) : lastMove.to
+    from: normalizePos((myRole === 'player2' ? flipPosition(lastMove.from) : lastMove.from).x, (myRole === 'player2' ? flipPosition(lastMove.from) : lastMove.from).y),
+    to: normalizePos((myRole === 'player2' ? flipPosition(lastMove.to) : lastMove.to).x, (myRole === 'player2' ? flipPosition(lastMove.to) : lastMove.to).y)
   } : null
   
   const isMyTurn = (myRole === 'player1' && turn === 'player1') || (myRole === 'player2' && turn === 'player2')
@@ -638,17 +643,18 @@ export default function Home() {
             </div>
           )}
 
-          <div className="max-w-3xl mx-auto flex items-center justify-between">
+          <div className="max-w-3xl mx-auto flex flex-wrap items-center justify-between gap-2">
             <button
               onClick={() => {
                 setMode('lobby')
                 setIsWaitingOpponent(false)
               }}
-              className="bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold px-3 py-1.5 rounded text-xs border border-gray-400"
+              className="bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold px-3 py-1.5 rounded text-xs border border-gray-400 whitespace-nowrap"
             >
-              ← ロビーへ撤退
+              ← 撤退
             </button>
-            <span className={`inline-block px-4 py-1.5 rounded-full font-black text-xs md:text-sm shadow-md border ${
+
+            <span className={`flex-1 text-center px-2 py-1.5 rounded-full font-black text-xs md:text-sm shadow-md border ${
               isOnlineMatch && isWaitingOpponent
                 ? 'bg-amber-600 text-white border-black'
                 : mode === 'finished'
@@ -663,9 +669,31 @@ export default function Home() {
                 ? '対局終了'
                 : isMyTurn
                 ? '⚔️ あなたの手番（コマを選択して移動）'
-                : '⌛ 相手の手番（相手の着手を待っています）'}
+                : '⌛ 相手の手番（着手を待っています）'}
             </span>
-            <div className="w-16" />
+
+            <button
+              onClick={() => {
+                if (channelRef.current && isOnlineMatch) {
+                  channelRef.current.send({
+                    type: 'broadcast',
+                    event: 'SYNC_FULL_STATE',
+                    payload: {
+                      p1Board,
+                      p2Board,
+                      turn,
+                      logs,
+                      lastMove,
+                      isWaitingOpponent: false,
+                    },
+                  })
+                  addLog('🔄 通信フリーズを解除し盤面を強制同期しました。')
+                }
+              }}
+              className="bg-blue-600 hover:bg-blue-700 text-white font-bold px-3 py-1.5 rounded text-xs border border-black shadow whitespace-nowrap"
+            >
+              🔄 再同期
+            </button>
           </div>
 
           <GameBoard

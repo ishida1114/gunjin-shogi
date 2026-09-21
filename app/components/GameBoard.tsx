@@ -23,9 +23,6 @@ export default function GameBoard({
   onCellClick,
 }: GameBoardProps) {
   const getPieceAt = (x: number, y: number): Piece | undefined => {
-    if ((y === 0 || y === 6) && x === 4) {
-      return pieces.find((p) => p.position.x === 3 && p.position.y === y)
-    }
     return pieces.find((p) => p.position.x === x && p.position.y === y)
   }
 
@@ -46,12 +43,13 @@ export default function GameBoard({
       <div className="grid grid-cols-8 gap-1 bg-[#d2b48c] p-2 rounded-lg border-2 border-[#8b5a2b] shadow-inner">
         {[0, 1, 2, 3, 4, 5, 6].map((y) =>
           [7, 6, 5, 4, 3, 2, 1, 0].map((x) => {
+            // 右側の司令部マスは描画をスキップ
             if ((y === 0 || y === 6) && x === 4) return null
 
             const piece = getPieceAt(x, y)
             const isSelected = selectedPiece?.position.x === x && selectedPiece?.position.y === y
-            const isValidMove = isValidMoveCell(x, y) || (isValidMoveCell(4, y) && (y===0 || y===6) && x===3)
-            const isLastMove = isLastMoveCell(x, y) || (isLastMoveCell(4, y) && (y===0 || y===6) && x===3)
+            const isValidMove = isValidMoveCell(x, y)
+            const isLastMove = isLastMoveCell(x, y)
 
             const isRiver = isRiverCell(x, y)
             const isEntry = isEntryCell(x, y)
@@ -61,15 +59,7 @@ export default function GameBoard({
             return (
               <button
                 key={`${x}-${y}`}
-                onClick={() => {
-                  let targetX = x
-                  if (isEnemyHQ || isMyHQ) {
-                    if (isValidMoveCell(3, y)) targetX = 3
-                    else if (isValidMoveCell(4, y)) targetX = 4
-                    else targetX = 3
-                  }
-                  onCellClick(targetX, y)
-                }}
+                onClick={() => onCellClick(x, y)}
                 className={`relative h-12 md:h-14 rounded flex flex-col items-center justify-center font-black text-xs md:text-sm transition-all border shadow-sm ${
                   isEnemyHQ || isMyHQ ? 'col-span-2' : '' 
                 } ${
@@ -78,7 +68,7 @@ export default function GameBoard({
                     : isValidMove
                     ? 'bg-emerald-200 border-emerald-500 ring-2 ring-emerald-400 animate-pulse z-10'
                     : isLastMove
-                    ? 'bg-amber-200 border-amber-500 ring-2 ring-amber-400 z-10' // 着手ハイライト
+                    ? 'bg-amber-200 border-amber-500 ring-2 ring-amber-400 z-10'
                     : piece
                     ? 'bg-[#fcf8f2] border-[#a87c4f]'
                     : isRiver

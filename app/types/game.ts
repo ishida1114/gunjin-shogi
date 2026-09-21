@@ -37,6 +37,19 @@ export const PIECE_LABELS: Record<PieceType, string> = {
   工兵: '工兵', スパイ: 'スパイ', 地雷: '地雷', 軍旗: '軍旗',
 }
 
+// 座標を内部標準(左側のx=3)に完全正規化し、消失バグを防ぐ
+export function normalizePos(x: number, y: number): Position {
+  if (y === 0 && x === 4) return { x: 3, y: 0 }
+  if (y === 6 && x === 4) return { x: 3, y: 6 }
+  return { x, y }
+}
+
+export function normalizeKey(key: string): string {
+  if (key === '4-0') return '3-0'
+  if (key === '4-6') return '3-6'
+  return key
+}
+
 export function isRiverCell(x: number, y: number): boolean {
   return y === 3 && x !== 2 && x !== 5
 }
@@ -57,7 +70,6 @@ export function isHQCell(x: number, y: number): boolean {
   return isEnemyHQCell(x, y) || isMyHQCell(x, y)
 }
 
-// 本部を占領可能なコマ判定（飛行機・タンク・地雷・軍旗は不可）
 export function canOccupyHQ(piece: PieceType): boolean {
   const cannot = ['地雷', '軍旗', '飛行機', 'タンク']
   return !cannot.includes(piece)
@@ -73,40 +85,39 @@ export function getValidAdjacentPositions(
   if (piece === '地雷' || piece === '軍旗') return []
 
   const valid: Position[] = []
-  
-  // 騎兵の前進方向（player1は上 y:-1、player2は下 y:1）
+  const addValidPos = (vx: number, vy: number) => {
+    const norm = normalizePos(vx, vy)
+    if (!valid.some(p => p.x === norm.x && p.y === norm.y)) {
+      valid.push(norm)
+    }
+  }
+
   const forwardDir = (myOwner === 'player1') ? { x: 0, y: -1 } : { x: 0, y: 1 }
-  
   const directions = piece === '騎兵' 
     ? [forwardDir] 
-    : [
-        { x: 0, y: -1 },
-        { x: 0, y: 1 },
-        { x: -1, y: 0 },
-        { x: 1, y: 0 },
-      ]
+    : [{ x: 0, y: -1 }, { x: 0, y: 1 }, { x: -1, y: 0 }, { x: 1, y: 0 }]
 
   const isTargetEnemyHQ = (tx: number, ty: number) => {
-    if (myOwner === 'player1') return ty === 0 && (tx === 3 || tx === 4)
-    return ty === 6 && (tx === 3 || tx === 4)
+    const norm = normalizePos(tx, ty)
+    if (myOwner === 'player1') return norm.y === 0 && norm.x === 3
+    return norm.y === 6 && norm.x === 3
   }
 
   if (piece === '飛行機') {
-    // 飛行機：味方は飛び越えるが、敵コマのマスで止まる（敵の飛越禁止）。本部は進入不可。
     for (const dir of directions) {
       let nx = x + dir.x
       let ny = y + dir.y
       while (nx >= 0 && nx <= 7 && ny >= 0 && ny <= 6) {
-        const targetKey = `${nx}-${ny}`
+        const norm = normalizePos(nx, ny)
+        const targetKey = `${norm.x}-${norm.y}`
         const occupant = boardState[targetKey]
         
-        // 川マス・敵本部マスには止まれない
         if (!isRiverCell(nx, ny) && !isTargetEnemyHQ(nx, ny)) {
           if (!occupant) {
-            valid.push({ x: nx, y: ny })
+            addValidPos(nx, ny)
           } else if (occupant.owner !== myOwner) {
-            valid.push({ x: nx, y: ny }) // 敵コママスに着地して攻撃
-            break // 敵を飛び越えることはできない
+            addValidPos(nx, ny)
+            break
           }
         }
         nx += dir.x
@@ -114,43 +125,41 @@ export function getValidAdjacentPositions(
       }
     }
   } else if (piece === '工兵' || piece === 'タンク' || piece === '騎兵') {
-    // 直線移動コマ
     for (const dir of directions) {
       let nx = x + dir.x
       let ny = y + dir.y
       while (nx >= 0 && nx <= 7 && ny >= 0 && ny <= 6) {
-        if (isRiverCell(nx, ny)) break // 川は侵入不可
-
-        // タンクや騎兵が敵本部へ入るのを禁止
+        if (isRiverCell(nx, ny)) break
         if (isTargetEnemyHQ(nx, ny) && !canOccupyHQ(piece)) break
 
-        const targetKey = `${nx}-${ny}`
+        const norm = normalizePos(nx, ny)
+        const targetKey = `${norm.x}-${norm.y}`
         const occupant = boardState[targetKey]
 
         if (!occupant) {
-          valid.push({ x: nx, y: ny })
+          addValidPos(nx, ny)
         } else {
           if (occupant.owner !== myOwner) {
-            valid.push({ x: nx, y: ny })
+            addValidPos(nx, ny)
           }
-          break // 駒にぶつかったらストップ
+          break
         }
         nx += dir.x
         ny += dir.y
       }
     }
   } else {
-    // 通常駒（1マス移動）
     for (const dir of directions) {
       const nx = x + dir.x
       const ny = y + dir.y
       if (nx >= 0 && nx <= 7 && ny >= 0 && ny <= 6) {
         if (isRiverCell(nx, ny)) continue
 
-        const targetKey = `${nx}-${ny}`
+        const norm = normalizePos(nx, ny)
+        const targetKey = `${norm.x}-${norm.y}`
         const occupant = boardState[targetKey]
         if (!occupant || occupant.owner !== myOwner) {
-          valid.push({ x: nx, y: ny })
+          addValidPos(nx, ny)
         }
       }
     }
